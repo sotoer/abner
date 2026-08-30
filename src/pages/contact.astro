@@ -1,0 +1,91 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Contact" description="Get in touch — placeholder contact form.">
+  <section class="container contact">
+    <h1>Contact</h1>
+    <p>
+      Placeholder contact copy. Replace with real contact details, and
+      decide how this form should actually submit (Netlify Forms, Formspree,
+      or a simple mailto link) before launch.
+    </p>
+
+    <!-- TODO: wire this form to Netlify Forms or Formspree once a backend is chosen -->
+    <form class="contact__form" action="#" method="post">
+      <label>
+        Name
+        <input type="text" name="name" required />
+      </label>
+      <label>
+        Email
+        <input type="email" name="email" required />
+      </label>
+      <label>
+        Message
+        <textarea name="message" rows="5" required></textarea>
+      </label>
+      <button type="submit">Send</button>
+    </form>
+  </section>
+</BaseLayout>
+
+<style>
+  .contact {
+    padding-block: var(--space-5);
+    max-width: 560px;
+  }
+
+  .contact h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 1.1rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-2);
+  }
+
+  .contact__form {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+  }
+
+  .contact__form label {
+    display: grid;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+  }
+
+  .contact__form input,
+  .contact__form textarea {
+    font: inherit;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 3px;
+    background: #fff;
+    color: var(--color-text);
+  }
+
+  .contact__form button {
+    justify-self: start;
+    margin-top: var(--space-1);
+    padding: 0.6rem 1.5rem;
+    border: 1px solid var(--color-text);
+    background: none;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .contact__form button:hover {
+    background: var(--color-text);
+    color: var(--color-bg);
+  }
+</style>

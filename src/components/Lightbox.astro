@@ -1,0 +1,236 @@
+---
+// Overlay image viewer. Include once on any page that renders GalleryCards
+// (data-lightbox-trigger elements) — it wires itself up to whatever
+// triggers exist on the page at load time.
+---
+
+<div class="lightbox" id="lightbox" hidden aria-hidden="true">
+  <div class="lightbox__backdrop" data-lightbox-close></div>
+  <div class="lightbox__dialog" role="dialog" aria-modal="true" aria-label="Image viewer">
+    <button type="button" class="lightbox__close" data-lightbox-close aria-label="Close">
+      &#x2715;
+    </button>
+    <button type="button" class="lightbox__prev" data-lightbox-prev aria-label="Previous image">
+      &#x2039;
+    </button>
+    <figure class="lightbox__figure">
+      <img class="lightbox__image" id="lightbox-image" alt="" />
+      <figcaption class="lightbox__caption" id="lightbox-caption"></figcaption>
+    </figure>
+    <button type="button" class="lightbox__next" data-lightbox-next aria-label="Next image">
+      &#x203A;
+    </button>
+    <ul class="lightbox__filmstrip" id="lightbox-filmstrip"></ul>
+  </div>
+</div>
+
+<style>
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+  }
+
+  .lightbox[hidden] {
+    display: none;
+  }
+
+  .lightbox__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+  }
+
+  .lightbox__dialog {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    gap: var(--space-2);
+  }
+
+  .lightbox__figure {
+    margin: 0;
+    max-width: min(90vw, 1400px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .lightbox__image {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+  }
+
+  .lightbox__caption {
+    color: #fff;
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.8;
+  }
+
+  .lightbox__close,
+  .lightbox__prev,
+  .lightbox__next {
+    position: absolute;
+    background: none;
+    border: 0;
+    color: #fff;
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: var(--space-1);
+  }
+
+  .lightbox__close {
+    top: var(--space-2);
+    right: var(--space-2);
+  }
+
+  .lightbox__prev {
+    left: var(--space-2);
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .lightbox__next {
+    right: var(--space-2);
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .lightbox__filmstrip {
+    display: flex;
+    gap: var(--space-1);
+    overflow-x: auto;
+    max-width: 90vw;
+    padding-block: var(--space-1);
+  }
+
+  .lightbox__filmstrip img {
+    height: 60px;
+    width: auto;
+    opacity: 0.5;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+
+  .lightbox__filmstrip img.is-active {
+    opacity: 1;
+    outline: 2px solid var(--color-accent);
+  }
+</style>
+
+<script>
+  function initLightbox() {
+    const rootRaw = document.getElementById("lightbox");
+    const imageRaw = document.getElementById("lightbox-image");
+    const captionRaw = document.getElementById("lightbox-caption");
+    const filmstripRaw = document.getElementById("lightbox-filmstrip");
+    if (
+      !(rootRaw instanceof HTMLElement) ||
+      !(imageRaw instanceof HTMLImageElement) ||
+      !(captionRaw instanceof HTMLElement) ||
+      !(filmstripRaw instanceof HTMLElement)
+    ) {
+      return;
+    }
+
+    // Re-bind to non-nullable typed consts so the closures below (which
+    // TS otherwise re-widens to the nullable `getElementById` return type)
+    // see the already-checked, precise element types.
+    const root: HTMLElement = rootRaw;
+    const imageEl: HTMLImageElement = imageRaw;
+    const captionEl: HTMLElement = captionRaw;
+    const filmstripEl: HTMLElement = filmstripRaw;
+
+    const triggers = Array.from(
+      document.querySelectorAll("[data-lightbox-trigger]"),
+    );
+    if (triggers.length === 0) return;
+
+    let currentIndex = 0;
+    let lastFocused: HTMLElement | null = null;
+
+    function slideFor(el: Element) {
+      const target = el as HTMLElement;
+      return {
+        src: target.dataset.fullSrc || "",
+        alt: target.dataset.alt || "",
+        caption: target.dataset.caption || "",
+      };
+    }
+
+    function renderFilmstrip() {
+      filmstripEl.innerHTML = "";
+      triggers.forEach((el, i) => {
+        const li = document.createElement("li");
+        const img = document.createElement("img");
+        img.src = slideFor(el).src;
+        img.alt = "";
+        img.className = i === currentIndex ? "is-active" : "";
+        li.appendChild(img);
+        li.addEventListener("click", () => show(i));
+        filmstripEl.appendChild(li);
+      });
+    }
+
+    function show(index: number) {
+      currentIndex = (index + triggers.length) % triggers.length;
+      const slide = slideFor(triggers[currentIndex]);
+      imageEl.src = slide.src;
+      imageEl.alt = slide.alt;
+      captionEl.textContent = slide.caption;
+      renderFilmstrip();
+    }
+
+    function open(index: number) {
+      lastFocused = document.activeElement as HTMLElement | null;
+      show(index);
+      root.hidden = false;
+      root.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+      root.querySelector<HTMLElement>("[data-lightbox-close]")?.focus();
+    }
+
+    function close() {
+      root.hidden = true;
+      root.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+      lastFocused?.focus();
+    }
+
+    triggers.forEach((el, i) => {
+      el.addEventListener("click", () => open(i));
+    });
+
+    root.querySelectorAll("[data-lightbox-close]").forEach((el) => {
+      el.addEventListener("click", close);
+    });
+    root
+      .querySelector("[data-lightbox-prev]")
+      ?.addEventListener("click", () => show(currentIndex - 1));
+    root
+      .querySelector("[data-lightbox-next]")
+      ?.addEventListener("click", () => show(currentIndex + 1));
+
+    document.addEventListener("keydown", (e) => {
+      if (root.hidden) return;
+      if (e.key === "Escape") close();
+      if (e.key === "ArrowLeft") show(currentIndex - 1);
+      if (e.key === "ArrowRight") show(currentIndex + 1);
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initLightbox);
+  } else {
+    initLightbox();
+  }
+</script>

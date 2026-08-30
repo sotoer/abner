@@ -1,0 +1,85 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { Image } from "astro:assets";
+import { getCollection } from "astro:content";
+import categoriesData from "../../data/categories.json";
+
+const allEntries = await getCollection("galleries");
+
+const categoryCards = categoriesData
+  .map((category) => {
+    const cover = allEntries
+      .filter((entry) => entry.data.category === category.slug)
+      .sort((a, b) => a.data.order - b.data.order)[0];
+    return cover ? { ...category, cover } : null;
+  })
+  .filter((card): card is NonNullable<typeof card> => card !== null)
+  .sort((a, b) => a.order - b.order);
+---
+
+<BaseLayout title="Work" description="Browse photography galleries by category.">
+  <section class="container work-index">
+    <h1>Work</h1>
+    <ul class="work-index__grid">
+      {
+        categoryCards.map((category) => (
+          <li>
+            <a href={`/work/${category.slug}`} class="work-index__card">
+              <Image
+                src={category.cover.data.image}
+                alt={category.cover.data.alt}
+                width={800}
+              />
+              <span class="work-index__label">{category.label}</span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+</BaseLayout>
+
+<style>
+  .work-index {
+    padding-block: var(--space-4) var(--space-6);
+  }
+
+  .work-index h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 1.1rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+  }
+
+  .work-index__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--space-3);
+  }
+
+  .work-index__card {
+    display: block;
+    position: relative;
+  }
+
+  .work-index__card :global(img) {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    transition: opacity 0.2s ease;
+  }
+
+  .work-index__card:hover :global(img) {
+    opacity: 0.85;
+  }
+
+  .work-index__label {
+    display: block;
+    margin-top: var(--space-1);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.85rem;
+  }
+</style>

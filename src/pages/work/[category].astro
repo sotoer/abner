@@ -1,0 +1,62 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import MasonryGrid from "../../components/MasonryGrid.astro";
+import GalleryCard from "../../components/GalleryCard.astro";
+import Lightbox from "../../components/Lightbox.astro";
+import { getCollection } from "astro:content";
+import categoriesData from "../../data/categories.json";
+
+export async function getStaticPaths() {
+  return categoriesData.map((category) => ({
+    params: { category: category.slug },
+    props: { category },
+  }));
+}
+
+interface Props {
+  category: (typeof categoriesData)[number];
+}
+
+const { category } = Astro.props;
+const allEntries = await getCollection("galleries");
+const entries = allEntries
+  .filter((entry) => entry.data.category === category.slug)
+  .sort((a, b) => a.data.order - b.data.order);
+---
+
+<BaseLayout
+  title={category.label}
+  description={`${category.label} photography gallery.`}
+>
+  <section class="container gallery-page">
+    <h1>{category.label}</h1>
+    <MasonryGrid>
+      {
+        entries.map((entry, i) => (
+          <GalleryCard
+            image={entry.data.image}
+            alt={entry.data.alt}
+            title={entry.data.title}
+            index={i}
+          />
+        ))
+      }
+    </MasonryGrid>
+  </section>
+
+  <Lightbox />
+</BaseLayout>
+
+<style>
+  .gallery-page {
+    padding-block: var(--space-4) var(--space-6);
+  }
+
+  .gallery-page h1 {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 1.1rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+  }
+</style>

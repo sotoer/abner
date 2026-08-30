@@ -1,0 +1,51 @@
+---
+import { Image, getImage } from "astro:assets";
+import type { ImageMetadata } from "astro";
+
+interface Props {
+  image: ImageMetadata;
+  alt: string;
+  title: string;
+  index: number;
+}
+
+const { image, alt, title, index } = Astro.props;
+
+// A larger render of the same source, used by the lightbox when this card
+// is clicked. The visible thumbnail below stays small/responsive.
+const full = await getImage({ src: image, width: 1600 });
+---
+
+<button
+  type="button"
+  class="gallery-card"
+  data-lightbox-trigger
+  data-index={index}
+  data-full-src={full.src}
+  data-alt={alt}
+  data-caption={title}
+  aria-label={`View ${title} full size`}
+>
+  <Image src={image} alt={alt} width={700} loading="lazy" />
+</button>
+
+<style>
+  .gallery-card {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .gallery-card :global(img) {
+    width: 100%;
+    height: auto;
+    transition: opacity 0.2s ease;
+  }
+
+  .gallery-card:hover :global(img) {
+    opacity: 0.85;
+  }
+</style>

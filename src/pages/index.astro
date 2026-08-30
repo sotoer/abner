@@ -1,17 +1,82 @@
 ---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import MasonryGrid from "../components/MasonryGrid.astro";
+import GalleryCard from "../components/GalleryCard.astro";
+import Lightbox from "../components/Lightbox.astro";
+import { getCollection } from "astro:content";
 
+const allEntries = await getCollection("galleries");
+const featured = allEntries.filter((entry) => entry.data.featured).slice(0, 6);
 ---
 
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<BaseLayout
+  title="Abner Photography"
+  description="Photography portfolio — placeholder home page, replace with real hero imagery and copy."
+>
+  <section class="hero container">
+    <h1>Abner Photography</h1>
+    <p class="hero__tagline">
+      Placeholder tagline — replace with a one-line description of your work
+      (e.g. "Portrait and editorial photography based in ______").
+    </p>
+    <a href="/work" class="hero__cta">View the work &rarr;</a>
+  </section>
+
+  <section class="featured container">
+    <h2>Featured work</h2>
+    <MasonryGrid>
+      {
+        featured.map((entry, i) => (
+          <GalleryCard
+            image={entry.data.image}
+            alt={entry.data.alt}
+            title={entry.data.title}
+            index={i}
+          />
+        ))
+      }
+    </MasonryGrid>
+  </section>
+
+  <Lightbox />
+</BaseLayout>
+
+<style>
+  .hero {
+    padding-block: var(--space-6);
+    max-width: 700px;
+  }
+
+  .hero h1 {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    letter-spacing: 0.02em;
+  }
+
+  .hero__tagline {
+    margin-top: var(--space-2);
+    color: var(--color-text-muted);
+  }
+
+  .hero__cta {
+    display: inline-block;
+    margin-top: var(--space-3);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.85rem;
+    color: var(--color-accent);
+    border-bottom: 1px solid currentColor;
+    padding-bottom: 2px;
+  }
+
+  .featured {
+    padding-bottom: var(--space-6);
+  }
+
+  .featured h2 {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+  }
+</style>
