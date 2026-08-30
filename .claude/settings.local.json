@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:www.annabellebreakey.com)",
-      "Bash(curl -s -A \"Mozilla/5.0\" https://www.annabellebreakey.com/)"
-    ]
-  }
-}
