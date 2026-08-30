@@ -1,0 +1,73 @@
+---
+const links = [
+  { href: "/work", label: "Work" },
+  { href: "/about", label: "About" },
+  { href: "/contact", label: "Contact" },
+];
+const currentPath = Astro.url.pathname;
+---
+
+<header class="site-nav">
+  <div class="container site-nav__inner">
+    <a href="/" class="site-nav__logo">Abner</a>
+    <nav aria-label="Main">
+      <ul>
+        {
+          links.map((link) => (
+            <li>
+              <a
+                href={link.href}
+                aria-current={
+                  currentPath.startsWith(link.href) ? "page" : undefined
+                }
+              >
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-nav {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .site-nav__inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--nav-height);
+  }
+
+  .site-nav__logo {
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  nav ul {
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  nav a {
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    transition: color 0.15s ease;
+  }
+
+  nav a:hover,
+  nav a[aria-current="page"] {
+    color: var(--color-accent);
+  }
+</style>

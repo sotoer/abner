@@ -1,0 +1,17 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const siteTitle = "Abner Photography";
+const { title, description = "A photography portfolio by Abner." } =
+  Astro.props;
+const fullTitle = title === siteTitle ? title : `${title} — ${siteTitle}`;
+---
+
+<title>{fullTitle}</title>
+<meta name="description" content={description} />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:type" content="website" />
