@@ -4,6 +4,7 @@ import MasonryGrid from "../components/MasonryGrid.astro";
 import GalleryCard from "../components/GalleryCard.astro";
 import Lightbox from "../components/Lightbox.astro";
 import { getCollection } from "astro:content";
+import { withBase } from "../lib/url";
 
 const allEntries = await getCollection("galleries");
 const featured = allEntries.filter((entry) => entry.data.featured).slice(0, 6);
@@ -19,7 +20,7 @@ const featured = allEntries.filter((entry) => entry.data.featured).slice(0, 6);
       Placeholder tagline — replace with a one-line description of your work
       (e.g. "Portrait and editorial photography based in ______").
     </p>
-    <a href="/work" class="hero__cta">View the work &rarr;</a>
+    <a href={withBase("/work")} class="hero__cta">View the work &rarr;</a>
   </section>
 
   <section class="featured container">

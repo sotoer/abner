@@ -1,4 +1,6 @@
 ---
+import { withBase } from "../lib/url";
+
 const links = [
   { href: "/work", label: "Work" },
   { href: "/about", label: "About" },
@@ -9,16 +11,18 @@ const currentPath = Astro.url.pathname;
 
 <header class="site-nav">
   <div class="container site-nav__inner">
-    <a href="/" class="site-nav__logo">Abner</a>
+    <a href={withBase("/")} class="site-nav__logo">Abner</a>
     <nav aria-label="Main">
       <ul>
         {
           links.map((link) => (
             <li>
               <a
-                href={link.href}
+                href={withBase(link.href)}
                 aria-current={
-                  currentPath.startsWith(link.href) ? "page" : undefined
+                  currentPath.startsWith(withBase(link.href))
+                    ? "page"
+                    : undefined
                 }
               >
                 {link.label}

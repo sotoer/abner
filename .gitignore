@@ -14,8 +14,8 @@ node_modules/
 .vscode/*
 !.vscode/extensions.json
 
-# local Claude Code settings (machine-specific)
-.claude/settings.local.json
+# local Claude Code state (settings, worktrees) — machine-specific
+.claude/
 
 # logs
 npm-debug.log*

@@ -3,6 +3,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import { Image } from "astro:assets";
 import { getCollection } from "astro:content";
 import categoriesData from "../../data/categories.json";
+import { withBase } from "../../lib/url";
 
 const allEntries = await getCollection("galleries");
 
@@ -24,7 +25,7 @@ const categoryCards = categoriesData
       {
         categoryCards.map((category) => (
           <li>
-            <a href={`/work/${category.slug}`} class="work-index__card">
+            <a href={withBase(`/work/${category.slug}`)} class="work-index__card">
               <Image
                 src={category.cover.data.image}
                 alt={category.cover.data.alt}
