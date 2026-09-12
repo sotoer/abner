@@ -1,0 +1,51 @@
+---
+import { Image, getImage } from "astro:assets";
+import type { CategoryCard } from "../lib/categoryCards";
+
+interface Props {
+  category: CategoryCard;
+}
+
+const { category } = Astro.props;
+
+// Every photo in this category, rendered large for the lightbox. Clicking
+// the tile below opens the whole gallery for this category right here on
+// the homepage, via Lightbox's data-slides support — see that component.
+const slides = await Promise.all(
+  category.entries.map(async (entry) => {
+    const full = await getImage({ src: entry.data.image, width: 1600 });
+    return { src: full.src, alt: entry.data.alt, caption: entry.data.title };
+  }),
+);
+---
+
+<button
+  type="button"
+  class="category-mosaic-card"
+  data-lightbox-trigger
+  data-slides={JSON.stringify(slides)}
+  aria-label={`View the ${category.label} gallery`}
+>
+  <Image src={category.cover.data.image} alt={category.cover.data.alt} width={700} loading="lazy" />
+</button>
+
+<style>
+  .category-mosaic-card {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .category-mosaic-card :global(img) {
+    width: 100%;
+    height: auto;
+    transition: opacity 0.2s ease;
+  }
+
+  .category-mosaic-card:hover :global(img) {
+    opacity: 0.85;
+  }
+</style>
