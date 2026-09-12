@@ -25,3 +25,7 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# raw/unprocessed source photos — never committed; converted copies live
+# under src/content/galleries/
+src/portfolio/
