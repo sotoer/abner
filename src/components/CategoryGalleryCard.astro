@@ -115,10 +115,12 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
     return shuffled;
   }
 
-  // How often a single tile transitions. Kept as one shared, serialized
-  // rotation (rather than each tile running its own independent timer) so
-  // exactly one image is ever mid-transition at a time.
-  const TICK_MS = 1800;
+  // Every image should stay up for at least this long before it's cycled
+  // out. Transitions are serialized (one tile at a time — see
+  // initMosaicCycling), so the tick interval is derived from this and the
+  // actual tile count, rather than a fixed tick that would only happen to
+  // honor this minimum for one particular number of tiles.
+  const MIN_DISPLAY_MS = 10000;
 
   interface TileState {
     layers: HTMLImageElement[];
@@ -231,7 +233,11 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
 
     // Round-robin through every tile across every category, reshuffled
     // each full pass, firing one transition per tick — never more than
-    // one at once.
+    // one at once. A full pass takes tickMs * advanceFns.length, which is
+    // exactly how long any single tile's image stays up before its next
+    // turn, so derive the tick from the tile count to guarantee the
+    // minimum regardless of how many tiles end up on the page.
+    const tickMs = MIN_DISPLAY_MS / advanceFns.length;
     let order = shuffle(advanceFns);
     let pos = 0;
     setInterval(() => {
@@ -240,7 +246,7 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
         pos = 0;
       }
       order[pos++]();
-    }, TICK_MS);
+    }, tickMs);
   }
 
   if (document.readyState === "loading") {
