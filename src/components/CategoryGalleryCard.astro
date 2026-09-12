@@ -114,71 +114,88 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
     return shuffled;
   }
 
+  // How often a single tile transitions. Kept as one shared, serialized
+  // rotation (rather than each tile running its own independent timer) so
+  // exactly one image is ever mid-transition at a time.
+  const TICK_MS = 1800;
+
+  function createTile(tile: HTMLElement): (() => void) | null {
+    const raw = tile.dataset.cyclePool;
+    if (!raw) return null;
+
+    let pool: Thumb[];
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed) || parsed.length === 0) return null;
+      pool = parsed;
+    } catch {
+      return null;
+    }
+
+    const layers = Array.from(
+      tile.querySelectorAll<HTMLImageElement>(".category-mosaic-card__img"),
+    );
+    if (layers.length < 2) return null;
+
+    let queue = shuffle(pool);
+    let queuePos = 0;
+    let activeLayer =
+      layers.find((img) => img.classList.contains("is-active")) ?? layers[0];
+
+    function advance(instant: boolean) {
+      if (queuePos >= queue.length) {
+        queue = shuffle(pool);
+        queuePos = 0;
+      }
+      const thumb = queue[queuePos++];
+      const nextLayer = layers.find((img) => img !== activeLayer)!;
+      nextLayer.src = thumb.src;
+      nextLayer.alt = thumb.alt;
+
+      if (instant) {
+        layers.forEach((img) => img.classList.remove("is-active"));
+        nextLayer.classList.add("is-active");
+        activeLayer = nextLayer;
+        return;
+      }
+
+      // Give the browser a frame to paint the new src before crossfading
+      // to it, so the transition actually has something to animate from.
+      requestAnimationFrame(() => {
+        activeLayer.classList.remove("is-active");
+        nextLayer.classList.add("is-active");
+        activeLayer = nextLayer;
+      });
+    }
+
+    // Randomize the visible photo immediately rather than leaving the
+    // server-rendered seed up, so every page load shows a fresh pick.
+    advance(true);
+
+    return () => advance(false);
+  }
+
   function initMosaicCycling() {
     const tiles = Array.from(
       document.querySelectorAll<HTMLElement>("[data-cycle-pool]"),
     );
 
-    tiles.forEach((tile) => {
-      const raw = tile.dataset.cyclePool;
-      if (!raw) return;
+    const advanceFns = tiles
+      .map(createTile)
+      .filter((fn): fn is () => void => fn !== null);
+    if (advanceFns.length === 0) return;
 
-      let pool: Thumb[];
-      try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed) || parsed.length === 0) return;
-        pool = parsed;
-      } catch {
-        return;
+    // Round-robin through every tile, reshuffled each full pass, firing
+    // one transition per tick — never more than one at once.
+    let order = shuffle(advanceFns);
+    let pos = 0;
+    setInterval(() => {
+      if (pos >= order.length) {
+        order = shuffle(advanceFns);
+        pos = 0;
       }
-
-      const layers = Array.from(
-        tile.querySelectorAll<HTMLImageElement>(".category-mosaic-card__img"),
-      );
-      if (layers.length < 2) return;
-
-      let queue = shuffle(pool);
-      let queuePos = 0;
-      let activeLayer =
-        layers.find((img) => img.classList.contains("is-active")) ?? layers[0];
-
-      function advance(instant: boolean) {
-        if (queuePos >= queue.length) {
-          queue = shuffle(pool);
-          queuePos = 0;
-        }
-        const thumb = queue[queuePos++];
-        const nextLayer = layers.find((img) => img !== activeLayer)!;
-        nextLayer.src = thumb.src;
-        nextLayer.alt = thumb.alt;
-
-        if (instant) {
-          layers.forEach((img) => img.classList.remove("is-active"));
-          nextLayer.classList.add("is-active");
-          activeLayer = nextLayer;
-          return;
-        }
-
-        // Give the browser a frame to paint the new src before crossfading
-        // to it, so the transition actually has something to animate from.
-        requestAnimationFrame(() => {
-          activeLayer.classList.remove("is-active");
-          nextLayer.classList.add("is-active");
-          activeLayer = nextLayer;
-        });
-      }
-
-      // Randomize the visible photo immediately rather than leaving the
-      // server-rendered seed up, so every page load shows a fresh pick.
-      advance(true);
-
-      const interval = 4000 + Math.random() * 2000;
-      const startDelay = Math.random() * interval;
-      setTimeout(() => {
-        advance(false);
-        setInterval(() => advance(false), interval);
-      }, startDelay);
-    });
+      order[pos++]();
+    }, TICK_MS);
   }
 
   if (document.readyState === "loading") {
