@@ -176,9 +176,11 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
 
     function advance(index: number, instant: boolean) {
       const state = states[index];
+      // Exclude every tile's current photo in this group, including this
+      // tile's own — otherwise a draw can hand a tile back the same photo
+      // it's already showing, which "transitions" to an identical image.
       const excluding = new Set(
         states
-          .filter((_, i) => i !== index)
           .map((s) => s.current?.src)
           .filter((src): src is string => !!src),
       );
