@@ -1,26 +1,11 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { Image } from "astro:assets";
+import CategoryCard from "../../components/CategoryCard.astro";
 import { getCollection } from "astro:content";
-import categoriesData from "../../data/categories.json";
-import { withBase } from "../../lib/url";
+import { getCategoryCards } from "../../lib/categoryCards";
 
 const allEntries = await getCollection("galleries");
-
-const categoryCards = categoriesData
-  .map((category) => {
-    const cover = allEntries
-      .filter((entry) => entry.data.category === category.slug)
-      .sort((a, b) => a.data.order - b.data.order)[0];
-    if (!cover) return null;
-    // The card crops to a landscape (4:3) box. A portrait-oriented cover
-    // photo centered in that crop tends to lose the top of the subject, so
-    // anchor those to the top instead of the default center.
-    const isPortrait = cover.data.image.height > cover.data.image.width;
-    return { ...category, cover, isPortrait };
-  })
-  .filter((card): card is NonNullable<typeof card> => card !== null)
-  .sort((a, b) => a.order - b.order);
+const categoryCards = getCategoryCards(allEntries);
 ---
 
 <BaseLayout title="Work" description="Browse photography galleries by category.">
@@ -30,15 +15,7 @@ const categoryCards = categoriesData
       {
         categoryCards.map((category) => (
           <li>
-            <a href={withBase(`/work/${category.slug}`)} class="work-index__card">
-              <Image
-                src={category.cover.data.image}
-                alt={category.cover.data.alt}
-                width={800}
-                class:list={["work-index__card-img", category.isPortrait && "work-index__card-img--top"]}
-              />
-              <span class="work-index__label">{category.label}</span>
-            </a>
+            <CategoryCard category={category} />
           </li>
         ))
       }
@@ -63,34 +40,5 @@ const categoryCards = categoriesData
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: var(--space-3);
-  }
-
-  .work-index__card {
-    display: block;
-    position: relative;
-  }
-
-  .work-index__card :global(img) {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    transition: opacity 0.2s ease;
-  }
-
-  .work-index__card :global(img.work-index__card-img--top) {
-    object-position: top;
-  }
-
-  .work-index__card:hover :global(img) {
-    opacity: 0.85;
-  }
-
-  .work-index__label {
-    display: block;
-    margin-top: var(--space-1);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 0.85rem;
   }
 </style>

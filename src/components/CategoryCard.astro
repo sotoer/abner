@@ -1,0 +1,52 @@
+---
+import { Image } from "astro:assets";
+import { withBase } from "../lib/url";
+import type { CategoryCard } from "../lib/categoryCards";
+
+interface Props {
+  category: CategoryCard;
+}
+
+const { category } = Astro.props;
+---
+
+<a href={withBase(`/work/${category.slug}`)} class="category-card">
+  <Image
+    src={category.cover.data.image}
+    alt={category.cover.data.alt}
+    width={800}
+    class:list={["category-card__img", category.isPortrait && "category-card__img--top"]}
+  />
+  <span class="category-card__label">{category.label}</span>
+</a>
+
+<style>
+  .category-card {
+    display: block;
+    position: relative;
+  }
+
+  .category-card :global(img) {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    transition: opacity 0.2s ease;
+  }
+
+  .category-card :global(img.category-card__img--top) {
+    object-position: top;
+  }
+
+  .category-card:hover :global(img) {
+    opacity: 0.85;
+  }
+
+  .category-card__label {
+    display: block;
+    margin-top: var(--space-1);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.85rem;
+  }
+</style>

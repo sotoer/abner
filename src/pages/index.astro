@@ -1,21 +1,22 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import MasonryGrid from "../components/MasonryGrid.astro";
-import GalleryCard from "../components/GalleryCard.astro";
+import CategoryGalleryCard from "../components/CategoryGalleryCard.astro";
 import Lightbox from "../components/Lightbox.astro";
 import { getCollection } from "astro:content";
+import { getCategoryCards } from "../lib/categoryCards";
 import { withBase } from "../lib/url";
 
 const allEntries = await getCollection("galleries");
-const featured = allEntries.filter((entry) => entry.data.featured).slice(0, 6);
+const categoryCards = getCategoryCards(allEntries);
 ---
 
 <BaseLayout
-  title="Abner Photography"
+  title="Abner Soto Photography"
   description="Photography portfolio — placeholder home page, replace with real hero imagery and copy."
 >
   <section class="hero container">
-    <h1>Abner Photography</h1>
+    <h1>Abner Soto Photography</h1>
     <p class="hero__tagline">
       Placeholder tagline — replace with a one-line description of your work
       (e.g. "Portrait and editorial photography based in ______").
@@ -27,13 +28,8 @@ const featured = allEntries.filter((entry) => entry.data.featured).slice(0, 6);
     <h2>Featured work</h2>
     <MasonryGrid>
       {
-        featured.map((entry, i) => (
-          <GalleryCard
-            image={entry.data.image}
-            alt={entry.data.alt}
-            title={entry.data.title}
-            index={i}
-          />
+        categoryCards.map((category) => (
+          <CategoryGalleryCard category={category} />
         ))
       }
     </MasonryGrid>
