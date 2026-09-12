@@ -50,6 +50,7 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
       data-lightbox-trigger
       data-slides={slidesJson}
       data-cycle-pool={thumbsJson}
+      data-cycle-group={category.slug}
       aria-label={`View the ${category.label} gallery`}
       style={`aspect-ratio: ${seed.width} / ${seed.height};`}
     >
@@ -119,60 +120,94 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
   // exactly one image is ever mid-transition at a time.
   const TICK_MS = 1800;
 
-  function createTile(tile: HTMLElement): (() => void) | null {
-    const raw = tile.dataset.cyclePool;
-    if (!raw) return null;
+  interface TileState {
+    layers: HTMLImageElement[];
+    active: HTMLImageElement;
+    current: Thumb | null;
+  }
+
+  // A category's tiles share one photo pool and coordinate their picks so
+  // no two of them ever display the same photo at once (different
+  // categories draw from disjoint pools, so that's the only place
+  // duplicates could happen).
+  function createGroup(tiles: HTMLElement[]): Array<() => void> {
+    const raw = tiles[0]?.dataset.cyclePool;
+    if (!raw) return [];
 
     let pool: Thumb[];
     try {
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return null;
+      if (!Array.isArray(parsed) || parsed.length === 0) return [];
       pool = parsed;
     } catch {
-      return null;
+      return [];
     }
 
-    const layers = Array.from(
-      tile.querySelectorAll<HTMLImageElement>(".category-mosaic-card__img"),
-    );
-    if (layers.length < 2) return null;
+    const states = tiles
+      .map((tile): TileState | null => {
+        const layers = Array.from(
+          tile.querySelectorAll<HTMLImageElement>(".category-mosaic-card__img"),
+        );
+        if (layers.length < 2) return null;
+        const active =
+          layers.find((img) => img.classList.contains("is-active")) ?? layers[0];
+        return { layers, active, current: null };
+      })
+      .filter((state): state is TileState => state !== null);
+    if (states.length === 0) return [];
 
     let queue = shuffle(pool);
-    let queuePos = 0;
-    let activeLayer =
-      layers.find((img) => img.classList.contains("is-active")) ?? layers[0];
 
-    function advance(instant: boolean) {
-      if (queuePos >= queue.length) {
-        queue = shuffle(pool);
-        queuePos = 0;
+    // Pull the next photo not currently shown by one of this tile's
+    // siblings, cycling the queue (and reshuffling once exhausted) until
+    // one is found.
+    function draw(excluding: Set<string>): Thumb {
+      for (let attempts = 0; attempts < pool.length * 2; attempts++) {
+        if (queue.length === 0) queue = shuffle(pool);
+        const candidate = queue.shift()!;
+        if (!excluding.has(candidate.src)) return candidate;
+        queue.push(candidate);
       }
-      const thumb = queue[queuePos++];
-      const nextLayer = layers.find((img) => img !== activeLayer)!;
+      // Only reachable if the pool is smaller than the tile group itself.
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+
+    function advance(index: number, instant: boolean) {
+      const state = states[index];
+      const excluding = new Set(
+        states
+          .filter((_, i) => i !== index)
+          .map((s) => s.current?.src)
+          .filter((src): src is string => !!src),
+      );
+      const thumb = draw(excluding);
+      state.current = thumb;
+
+      const nextLayer = state.layers.find((img) => img !== state.active)!;
       nextLayer.src = thumb.src;
       nextLayer.alt = thumb.alt;
 
       if (instant) {
-        layers.forEach((img) => img.classList.remove("is-active"));
+        state.layers.forEach((img) => img.classList.remove("is-active"));
         nextLayer.classList.add("is-active");
-        activeLayer = nextLayer;
+        state.active = nextLayer;
         return;
       }
 
       // Give the browser a frame to paint the new src before crossfading
       // to it, so the transition actually has something to animate from.
       requestAnimationFrame(() => {
-        activeLayer.classList.remove("is-active");
+        state.active.classList.remove("is-active");
         nextLayer.classList.add("is-active");
-        activeLayer = nextLayer;
+        state.active = nextLayer;
       });
     }
 
-    // Randomize the visible photo immediately rather than leaving the
-    // server-rendered seed up, so every page load shows a fresh pick.
-    advance(true);
+    // Seed every tile with a distinct random photo immediately, rather
+    // than leaving the server-rendered seeds up.
+    states.forEach((_, i) => advance(i, true));
 
-    return () => advance(false);
+    return states.map((_, i) => () => advance(i, false));
   }
 
   function initMosaicCycling() {
@@ -180,13 +215,23 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
       document.querySelectorAll<HTMLElement>("[data-cycle-pool]"),
     );
 
-    const advanceFns = tiles
-      .map(createTile)
-      .filter((fn): fn is () => void => fn !== null);
+    const groups = new Map<string, HTMLElement[]>();
+    tiles.forEach((tile) => {
+      const key = tile.dataset.cycleGroup ?? tile.dataset.cyclePool ?? "";
+      const group = groups.get(key);
+      if (group) {
+        group.push(tile);
+      } else {
+        groups.set(key, [tile]);
+      }
+    });
+
+    const advanceFns = Array.from(groups.values()).flatMap(createGroup);
     if (advanceFns.length === 0) return;
 
-    // Round-robin through every tile, reshuffled each full pass, firing
-    // one transition per tick — never more than one at once.
+    // Round-robin through every tile across every category, reshuffled
+    // each full pass, firing one transition per tick — never more than
+    // one at once.
     let order = shuffle(advanceFns);
     let pos = 0;
     setInterval(() => {
