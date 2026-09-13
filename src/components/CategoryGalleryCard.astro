@@ -120,7 +120,7 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
   // initMosaicCycling), so the tick interval is derived from this and the
   // actual tile count, rather than a fixed tick that would only happen to
   // honor this minimum for one particular number of tiles.
-  const MIN_DISPLAY_MS = 10000;
+  const MIN_DISPLAY_MS = 20000;
 
   interface TileState {
     layers: HTMLImageElement[];
