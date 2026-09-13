@@ -1,8 +1,10 @@
 ---
 // Thin wrapper around the `.masonry` CSS-columns utility (see
 // src/styles/global.css) so gallery pages don't repeat the class name.
+// Any extra props (e.g. data-* attributes a caller's client script needs
+// to find on the container) are forwarded onto the div as-is.
 ---
 
-<div class="masonry">
+<div class="masonry" {...Astro.props}>
   <slot />
 </div>

@@ -298,9 +298,16 @@
 
     let pageSlideIndex = 0;
     triggers.forEach((el) => {
-      const group = groupFor(el);
-      if (group) {
-        el.addEventListener("click", () => open(group, 0));
+      // Whether a trigger is grouped at all is decided once here (a
+      // page's triggers don't change kind), but a grouped trigger's
+      // *slides* can — e.g. a homepage mosaic tile that cycles into a
+      // different category re-targets its own data-slides — so re-read
+      // it on every click rather than closing over today's value.
+      if (groupFor(el)) {
+        el.addEventListener("click", () => {
+          const group = groupFor(el);
+          if (group) open(group, 0);
+        });
       } else {
         const index = pageSlideIndex++;
         el.addEventListener("click", () => open(pageSlides, index));
