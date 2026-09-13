@@ -28,9 +28,14 @@ const categoryCards = getCategoryCards(allEntries);
     <h2>Featured work</h2>
     <MasonryGrid>
       {
-        categoryCards.map((category) => (
-          <CategoryGalleryCard category={category} />
-        ))
+        // One tile per category per round, rather than each category's
+        // three tiles all in a row — keeps categories mixed together
+        // throughout the mosaic instead of clustered in solid blocks.
+        [0, 1, 2].map((tileIndex) =>
+          categoryCards.map((category) => (
+            <CategoryGalleryCard category={category} tileIndex={tileIndex} />
+          )),
+        )
       }
     </MasonryGrid>
   </section>
