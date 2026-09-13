@@ -1,14 +1,62 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import MasonryGrid from "../components/MasonryGrid.astro";
-import CategoryGalleryCard from "../components/CategoryGalleryCard.astro";
+import MosaicTile from "../components/MosaicTile.astro";
 import Lightbox from "../components/Lightbox.astro";
 import { getCollection } from "astro:content";
 import { getCategoryCards } from "../lib/categoryCards";
+import { toSlide, toThumb } from "../lib/galleryMedia";
 import { withBase } from "../lib/url";
 
 const allEntries = await getCollection("galleries");
 const categoryCards = getCategoryCards(allEntries);
+
+// Every category's full gallery, for the lightbox. A mosaic tile isn't
+// tied to one category — its cycling can swap in any category's photo
+// (see MosaicTile's client script) — so every tile needs access to
+// every category's slides, not just whichever one it started on. This
+// map is embedded once on the container below, rather than once per
+// tile, since every tile would otherwise repeat the same ~4 arrays.
+const slidesBySlug: Record<string, Awaited<ReturnType<typeof toSlide>>[]> = {};
+for (const category of categoryCards) {
+  slidesBySlug[category.slug] = await Promise.all(category.entries.map(toSlide));
+}
+const slidesBySlugJson = JSON.stringify(slidesBySlug);
+
+// One combined thumbnail pool spanning every category, each tagged with
+// which category (and its label) it belongs to — the pool the mosaic's
+// cycling script draws from client-side, embedded once on the container
+// for the same reason as slidesBySlug above.
+const categoryThumbs = await Promise.all(
+  categoryCards.map(async (category) => {
+    const thumbs = await Promise.all(
+      category.entries.map((entry) => toThumb(entry, 700)),
+    );
+    return {
+      category,
+      thumbs: thumbs.map((thumb) => ({
+        ...thumb,
+        category: category.slug,
+        categoryLabel: category.label,
+      })),
+    };
+  }),
+);
+const allThumbsJson = JSON.stringify(categoryThumbs.flatMap((c) => c.thumbs));
+
+// A fixed number of tiles, seeded round-robin across categories so the
+// mosaic starts out mixed even before client JS randomizes it further
+// (and keeps cycling it across every category from then on).
+const TILE_COUNT = 12;
+const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
+  const { category, thumbs } = categoryThumbs[i % categoryThumbs.length];
+  const round = Math.floor(i / categoryThumbs.length);
+  return {
+    thumb: thumbs[round % thumbs.length],
+    categoryLabel: category.label,
+    initialSlidesJson: JSON.stringify(slidesBySlug[category.slug]),
+  };
+});
 ---
 
 <BaseLayout
@@ -26,16 +74,18 @@ const categoryCards = getCategoryCards(allEntries);
 
   <section class="featured container">
     <h2>Featured work</h2>
-    <MasonryGrid>
+    <MasonryGrid data-mosaic-pool={allThumbsJson} data-mosaic-slides={slidesBySlugJson}>
       {
-        // One tile per category per round, rather than each category's
-        // three tiles all in a row — keeps categories mixed together
-        // throughout the mosaic instead of clustered in solid blocks.
-        [0, 1, 2].map((tileIndex) =>
-          categoryCards.map((category) => (
-            <CategoryGalleryCard category={category} tileIndex={tileIndex} />
-          )),
-        )
+        tileSeeds.map((seed) => (
+          <MosaicTile
+            thumbSrc={seed.thumb.src}
+            thumbAlt={seed.thumb.alt}
+            width={seed.thumb.width}
+            height={seed.thumb.height}
+            categoryLabel={seed.categoryLabel}
+            initialSlidesJson={seed.initialSlidesJson}
+          />
+        ))
       }
     </MasonryGrid>
   </section>

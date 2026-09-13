@@ -1,77 +1,41 @@
 ---
-import type { CategoryCard } from "../lib/categoryCards";
-import { getAspectRatio, toSlide, toThumb } from "../lib/galleryMedia";
-
+// One homepage mosaic tile. Unlike the rest of the gallery-rendering
+// components, a tile isn't tied to one category — the client script
+// (see below) redraws it from the *whole site's* combined photo/video
+// pool on each cycle, so a tile that starts out showing a portrait can
+// later show an architecture photo, a video, etc. The container this
+// renders into (see index.astro) carries that combined pool and a
+// slides-by-category lookup once, shared by every tile, rather than
+// each tile repeating its own copy.
 interface Props {
-  category: CategoryCard;
-  // Which of this category's (up to 3) tiles to render. The homepage
-  // renders one tileIndex at a time across all categories, then the
-  // next, so tiles from different categories interleave in the mosaic's
-  // DOM order instead of each category's tiles landing in one solid
-  // block (which visually clustered categories together, since earlier
-  // DOM order lands higher up in the packed layout).
-  tileIndex: number;
+  thumbSrc: string;
+  thumbAlt: string;
+  width: number;
+  height: number;
+  categoryLabel: string;
+  // This tile's *initial* category's full gallery, for the lightbox —
+  // both as the pre-JS/first-paint fallback and as the starting point
+  // the cycling script's aria-label/data-slides swap out from.
+  initialSlidesJson: string;
 }
 
-const { category, tileIndex } = Astro.props;
-
-// Full-size (or video-id) slides for the lightbox — clicking any of this
-// category's mosaic tiles opens the whole gallery, not just whatever
-// photo/video the tile happens to be showing at that moment.
-const slides = await Promise.all(category.entries.map(toSlide));
-const slidesJson = JSON.stringify(slides);
-
-// Thumbnail-sized renders of every entry in the category, each carrying
-// its own aspect ratio. Each of the three tiles below cycles through
-// these client-side (see <script> at the bottom) rather than being
-// locked to one photo per tile — and the client-side masonry layout
-// resizes/repositions a tile to match whichever one it's currently
-// showing, so the ratio needs to travel with the thumbnail.
-const thumbs = await Promise.all(
-  category.entries.map((entry) => toThumb(entry, 700)),
-);
-const thumbsJson = JSON.stringify(thumbs);
-
-// This tile's seed: (up to) three different entries per category so the
-// mosaic isn't identical boxes before client JS randomizes them on load.
-// The inline aspect-ratio below is only the pre-JS fallback (and the
-// starting point for the layout script) — client JS resizes the tile as
-// its cycling swaps in photos of other shapes. A category with fewer
-// than 3 entries simply renders fewer tiles (seed is null past its count).
-const seedCount = Math.min(3, thumbs.length);
-const seed =
-  tileIndex < seedCount
-    ? {
-        thumb: thumbs[tileIndex % thumbs.length],
-        ...getAspectRatio(category.entries[tileIndex % category.entries.length]),
-      }
-    : null;
+const { thumbSrc, thumbAlt, width, height, categoryLabel, initialSlidesJson } =
+  Astro.props;
 ---
 
-{
-  seed && (
-    <button
-      type="button"
-      class="category-mosaic-card"
-      data-lightbox-trigger
-      data-slides={slidesJson}
-      data-cycle-pool={thumbsJson}
-      data-cycle-group={category.slug}
-      data-aspect-w={seed.width}
-      data-aspect-h={seed.height}
-      aria-label={`View the ${category.label} gallery`}
-      style={`aspect-ratio: ${seed.width} / ${seed.height};`}
-    >
-      <img
-        class="category-mosaic-card__img is-active"
-        src={seed.thumb.src}
-        alt={seed.thumb.alt}
-        loading="lazy"
-      />
-      <img class="category-mosaic-card__img" alt="" />
-    </button>
-  )
-}
+<button
+  type="button"
+  class="category-mosaic-card"
+  data-lightbox-trigger
+  data-slides={initialSlidesJson}
+  data-aspect-w={width}
+  data-aspect-h={height}
+  aria-label={`View the ${categoryLabel} gallery`}
+  style={`aspect-ratio: ${width} / ${height};`}
+>
+  <img class="category-mosaic-card__img is-active" src={thumbSrc} alt={thumbAlt} loading="lazy" />
+  <img class="category-mosaic-card__img" alt="" />
+</button>
 
 <style>
   .category-mosaic-card {
@@ -128,6 +92,17 @@ const seed =
     alt: string;
     width: number;
     height: number;
+    category: string;
+    categoryLabel: string;
+  }
+
+  interface Slide {
+    kind: "photo" | "video";
+    src?: string;
+    vimeoId?: string;
+    thumbnail: string;
+    alt: string;
+    caption: string;
   }
 
   function shuffle<T>(items: T[]): T[] {
@@ -140,10 +115,10 @@ const seed =
   }
 
   // Every image should stay up for at least this long before it's cycled
-  // out. Transitions are serialized (one tile at a time — see
-  // initMosaicCycling), so the tick interval is derived from this and the
-  // actual tile count, rather than a fixed tick that would only happen to
-  // honor this minimum for one particular number of tiles.
+  // out. Transitions are serialized (one tile at a time), so the tick
+  // interval is derived from this and the actual tile count, rather than
+  // a fixed tick that would only happen to honor this minimum for one
+  // particular number of tiles.
   const MIN_DISPLAY_MS = 20000;
 
   interface TileState {
@@ -153,24 +128,27 @@ const seed =
     current: Thumb | null;
   }
 
-  // A category's tiles share one photo pool and coordinate their picks so
-  // no two of them ever display the same photo at once (different
-  // categories draw from disjoint pools, so that's the only place
-  // duplicates could happen).
-  function createGroup(tiles: HTMLElement[]): Array<() => void> {
-    const raw = tiles[0]?.dataset.cyclePool;
-    if (!raw) return [];
+  function initMosaicCycling() {
+    const container = document.querySelector<HTMLElement>(
+      ".masonry[data-mosaic-pool]",
+    );
+    if (!container) return;
 
     let pool: Thumb[];
+    let slidesByCategory: Record<string, Slide[]>;
     try {
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed) || parsed.length === 0) return [];
-      pool = parsed;
+      const parsedPool = JSON.parse(container.dataset.mosaicPool || "[]");
+      const parsedSlides = JSON.parse(container.dataset.mosaicSlides || "{}");
+      if (!Array.isArray(parsedPool) || parsedPool.length === 0) return;
+      pool = parsedPool;
+      slidesByCategory = parsedSlides;
     } catch {
-      return [];
+      return;
     }
 
-    const states = tiles
+    const states = Array.from(
+      container.querySelectorAll<HTMLElement>(".category-mosaic-card"),
+    )
       .map((tile): TileState | null => {
         const layers = Array.from(
           tile.querySelectorAll<HTMLImageElement>(".category-mosaic-card__img"),
@@ -181,13 +159,13 @@ const seed =
         return { el: tile, layers, active, current: null };
       })
       .filter((state): state is TileState => state !== null);
-    if (states.length === 0) return [];
+    if (states.length === 0) return;
 
     let queue = shuffle(pool);
 
-    // Pull the next photo not currently shown by one of this tile's
-    // siblings, cycling the queue (and reshuffling once exhausted) until
-    // one is found.
+    // Pull the next photo/video not currently shown by any tile —
+    // spanning every category now, not just this tile's own — cycling
+    // the queue (and reshuffling once exhausted) until one is found.
     function draw(excluding: Set<string>): Thumb {
       for (let attempts = 0; attempts < pool.length * 2; attempts++) {
         if (queue.length === 0) queue = shuffle(pool);
@@ -195,15 +173,15 @@ const seed =
         if (!excluding.has(candidate.src)) return candidate;
         queue.push(candidate);
       }
-      // Only reachable if the pool is smaller than the tile group itself.
+      // Only reachable if the pool is smaller than the tile count.
       return pool[Math.floor(Math.random() * pool.length)];
     }
 
     function advance(index: number, instant: boolean) {
       const state = states[index];
-      // Exclude every tile's current photo in this group, including this
-      // tile's own — otherwise a draw can hand a tile back the same photo
-      // it's already showing, which "transitions" to an identical image.
+      // Exclude every tile's current pick, including this tile's own —
+      // otherwise a draw can hand a tile back what it's already
+      // showing, which "transitions" to an identical image.
       const excluding = new Set(
         states
           .map((s) => s.current?.src)
@@ -212,9 +190,12 @@ const seed =
       const thumb = draw(excluding);
       state.current = thumb;
 
-      // Update the tile's own aspect ratio to match, and let the masonry
-      // layout know it needs to resize/reposition this tile (and
-      // whatever else that bumps into) to fit.
+      // The tile may be switching categories: swap in that category's
+      // gallery for the lightbox, update the label, and resize the box
+      // to match (the masonry layout listens for this event).
+      const slides = slidesByCategory[thumb.category];
+      if (slides) state.el.dataset.slides = JSON.stringify(slides);
+      state.el.setAttribute("aria-label", `View the ${thumb.categoryLabel} gallery`);
       state.el.dataset.aspectW = String(thumb.width);
       state.el.dataset.aspectH = String(thumb.height);
       state.el.dispatchEvent(
@@ -241,47 +222,25 @@ const seed =
       });
     }
 
-    // Seed every tile with a distinct random photo immediately, rather
-    // than leaving the server-rendered seeds up.
+    // Randomize every tile's photo immediately, rather than leaving the
+    // server-rendered seeds up.
     states.forEach((_, i) => advance(i, true));
 
-    return states.map((_, i) => () => advance(i, false));
-  }
-
-  function initMosaicCycling() {
-    const tiles = Array.from(
-      document.querySelectorAll<HTMLElement>("[data-cycle-pool]"),
-    );
-
-    const groups = new Map<string, HTMLElement[]>();
-    tiles.forEach((tile) => {
-      const key = tile.dataset.cycleGroup ?? tile.dataset.cyclePool ?? "";
-      const group = groups.get(key);
-      if (group) {
-        group.push(tile);
-      } else {
-        groups.set(key, [tile]);
-      }
-    });
-
-    const advanceFns = Array.from(groups.values()).flatMap(createGroup);
-    if (advanceFns.length === 0) return;
-
-    // Round-robin through every tile across every category, reshuffled
-    // each full pass, firing one transition per tick — never more than
-    // one at once. A full pass takes tickMs * advanceFns.length, which is
-    // exactly how long any single tile's image stays up before its next
-    // turn, so derive the tick from the tile count to guarantee the
-    // minimum regardless of how many tiles end up on the page.
-    const tickMs = MIN_DISPLAY_MS / advanceFns.length;
-    let order = shuffle(advanceFns);
+    // Round-robin through every tile, reshuffled each full pass, firing
+    // one transition per tick — never more than one at once. A full pass
+    // takes tickMs * states.length, which is exactly how long any single
+    // tile's image stays up before its next turn, so derive the tick
+    // from the tile count to guarantee the minimum regardless of how
+    // many tiles end up on the page.
+    const tickMs = MIN_DISPLAY_MS / states.length;
+    let order = shuffle(states.map((_, i) => i));
     let pos = 0;
     setInterval(() => {
       if (pos >= order.length) {
-        order = shuffle(advanceFns);
+        order = shuffle(order);
         pos = 0;
       }
-      order[pos++]();
+      advance(order[pos++], false);
     }, tickMs);
   }
 
