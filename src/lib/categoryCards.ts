@@ -1,5 +1,6 @@
 import type { CollectionEntry } from "astro:content";
 import categoriesData from "../data/categories.json";
+import { isPortraitEntry } from "./galleryMedia";
 
 export interface CategoryCard {
   slug: string;
@@ -30,7 +31,7 @@ export function getCategoryCards(
         .sort((a, b) => a.data.order - b.data.order);
       const cover = entries[0];
       if (!cover) return null;
-      const isPortrait = cover.data.image.height > cover.data.image.width;
+      const isPortrait = isPortraitEntry(cover);
       return { ...category, entries, cover, isPortrait };
     })
     .filter((card): card is NonNullable<typeof card> => card !== null)

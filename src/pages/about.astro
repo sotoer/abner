@@ -14,7 +14,9 @@ const [headshot] = await getCollection(
 <BaseLayout title="About" description="About the photographer — placeholder bio, replace with real copy.">
   <section class="container about">
     {
-      headshot && (
+      // The portraits category is photo-only (no video entries), so this
+      // is always defined — asserted since the schema can't express that.
+      headshot?.data.image && (
         <Image
           class="about__headshot"
           src={headshot.data.image}
