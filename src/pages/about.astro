@@ -6,7 +6,9 @@ import headshot from "../assets/about-headshot.jpg";
 
 <BaseLayout title="About" description="About the photographer — placeholder bio, replace with real copy.">
   <section class="container about">
-    <Image class="about__headshot" src={headshot} alt="Abner Soto" width={480} />
+    <div class="about__headshot">
+      <Image src={headshot} alt="Abner Soto" width={640} />
+    </div>
     <div class="about__copy">
       <h1>About</h1>
       <p>
@@ -37,7 +39,16 @@ import headshot from "../assets/about-headshot.jpg";
   }
 
   .about__headshot {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
     border-radius: 4px;
+  }
+
+  .about__headshot :global(img) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .about h1 {
