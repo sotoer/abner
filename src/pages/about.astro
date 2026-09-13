@@ -1,30 +1,14 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import { Image } from "astro:assets";
-import { getCollection } from "astro:content";
-
-// Stand in for a real headshot until one exists — just reuses the first
-// placeholder portrait so the layout can be seen with an image in place.
-const [headshot] = await getCollection(
-  "galleries",
-  (entry) => entry.data.category === "portraits",
-);
+import headshot from "../assets/about-headshot.jpg";
 ---
 
 <BaseLayout title="About" description="About the photographer — placeholder bio, replace with real copy.">
   <section class="container about">
-    {
-      // The portraits category is photo-only (no video entries), so this
-      // is always defined — asserted since the schema can't express that.
-      headshot?.data.image && (
-        <Image
-          class="about__headshot"
-          src={headshot.data.image}
-          alt="Placeholder headshot"
-          width={480}
-        />
-      )
-    }
+    <div class="about__headshot">
+      <Image src={headshot} alt="Abner Soto" width={640} />
+    </div>
     <div class="about__copy">
       <h1>About</h1>
       <p>
@@ -55,7 +39,16 @@ const [headshot] = await getCollection(
   }
 
   .about__headshot {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
     border-radius: 4px;
+  }
+
+  .about__headshot :global(img) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .about h1 {
