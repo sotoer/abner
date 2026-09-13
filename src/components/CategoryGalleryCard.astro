@@ -14,9 +14,12 @@ const { category } = Astro.props;
 const slides = await Promise.all(category.entries.map(toSlide));
 const slidesJson = JSON.stringify(slides);
 
-// Thumbnail-sized renders of every entry in the category. Each of the
-// three tiles below cycles through these client-side (see <script> at the
-// bottom) rather than being locked to one photo per tile.
+// Thumbnail-sized renders of every entry in the category, each carrying
+// its own aspect ratio. Each of the three tiles below cycles through
+// these client-side (see <script> at the bottom) rather than being
+// locked to one photo per tile — and the client-side masonry layout
+// resizes/repositions a tile to match whichever one it's currently
+// showing, so the ratio needs to travel with the thumbnail.
 const thumbs = await Promise.all(
   category.entries.map((entry) => toThumb(entry, 700)),
 );
@@ -24,8 +27,9 @@ const thumbsJson = JSON.stringify(thumbs);
 
 // Three tiles, seeded with (up to) three different entries so the mosaic
 // isn't three identical boxes before client JS randomizes them on load.
-// Also fixes each tile's aspect ratio so the crossfade below never causes
-// layout shift as it cycles through entries of other shapes.
+// The inline aspect-ratio below is only the pre-JS fallback (and the
+// starting point for the layout script) — client JS resizes the tile as
+// its cycling swaps in photos of other shapes.
 const seedCount = Math.min(3, thumbs.length);
 const tileSeeds = Array.from({ length: 3 }, (_, i) => {
   const entry = category.entries[i % category.entries.length];
@@ -43,6 +47,8 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
       data-slides={slidesJson}
       data-cycle-pool={thumbsJson}
       data-cycle-group={category.slug}
+      data-aspect-w={seed.width}
+      data-aspect-h={seed.height}
       aria-label={`View the ${category.label} gallery`}
       style={`aspect-ratio: ${seed.width} / ${seed.height};`}
     >
@@ -67,6 +73,20 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
     background: none;
     cursor: pointer;
     overflow: hidden;
+  }
+
+  /* Once the layout script measures the page and takes over (see
+     initMasonryLayout below), tiles are pulled out of the normal
+     column flow and placed/sized by JS instead, so their position and
+     size can be animated as cycling swaps in photos of other shapes. */
+  :global(.masonry.is-animated-mosaic) .category-mosaic-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition:
+      transform 0.6s ease,
+      width 0.6s ease,
+      height 0.6s ease;
   }
 
   .category-mosaic-card__img {
@@ -96,6 +116,8 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
   interface Thumb {
     src: string;
     alt: string;
+    width: number;
+    height: number;
   }
 
   function shuffle<T>(items: T[]): T[] {
@@ -115,6 +137,7 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
   const MIN_DISPLAY_MS = 20000;
 
   interface TileState {
+    el: HTMLElement;
     layers: HTMLImageElement[];
     active: HTMLImageElement;
     current: Thumb | null;
@@ -145,7 +168,7 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
         if (layers.length < 2) return null;
         const active =
           layers.find((img) => img.classList.contains("is-active")) ?? layers[0];
-        return { layers, active, current: null };
+        return { el: tile, layers, active, current: null };
       })
       .filter((state): state is TileState => state !== null);
     if (states.length === 0) return [];
@@ -178,6 +201,15 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
       );
       const thumb = draw(excluding);
       state.current = thumb;
+
+      // Update the tile's own aspect ratio to match, and let the masonry
+      // layout know it needs to resize/reposition this tile (and
+      // whatever else that bumps into) to fit.
+      state.el.dataset.aspectW = String(thumb.width);
+      state.el.dataset.aspectH = String(thumb.height);
+      state.el.dispatchEvent(
+        new CustomEvent("mosaic:aspect-change", { bubbles: true }),
+      );
 
       const nextLayer = state.layers.find((img) => img !== state.active)!;
       nextLayer.src = thumb.src;
@@ -243,9 +275,94 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
     }, tickMs);
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initMosaicCycling);
-  } else {
+  // Measures a spacing token in pixels via a throwaway probe element,
+  // rather than hardcoding a px value that would drift from global.css.
+  function measureSpaceToken(token: string): number {
+    const probe = document.createElement("div");
+    probe.style.position = "absolute";
+    probe.style.visibility = "hidden";
+    probe.style.width = `var(${token})`;
+    document.body.appendChild(probe);
+    const px = probe.getBoundingClientRect().width;
+    probe.remove();
+    return px || 16;
+  }
+
+  function columnsForWidth(width: number): number {
+    if (width >= 1024) return 3;
+    if (width >= 640) return 2;
+    return 1;
+  }
+
+  // A small self-packing masonry: unlike the CSS-columns layout it
+  // replaces, this positions each tile explicitly (translate + explicit
+  // width/height) so that a tile resizing — because its cycling swapped
+  // in a photo of a different shape — animates smoothly, and shuffles
+  // every other tile's position to match rather than just growing in
+  // place.
+  function initMasonryLayout() {
+    const containers = new Set<HTMLElement>();
+    document.querySelectorAll<HTMLElement>(".category-mosaic-card").forEach((tile) => {
+      const container = tile.closest<HTMLElement>(".masonry");
+      if (container) containers.add(container);
+    });
+    if (containers.size === 0) return;
+
+    const gapPx = measureSpaceToken("--space-2");
+
+    function layout(container: HTMLElement) {
+      const tiles = Array.from(
+        container.querySelectorAll<HTMLElement>(".category-mosaic-card"),
+      );
+      if (tiles.length === 0) return;
+
+      const columns = columnsForWidth(window.innerWidth);
+      const colWidth = (container.clientWidth - gapPx * (columns - 1)) / columns;
+      const colHeights = new Array(columns).fill(0);
+
+      tiles.forEach((tile) => {
+        const aspectW = Number(tile.dataset.aspectW) || 1;
+        const aspectH = Number(tile.dataset.aspectH) || 1;
+        const height = colWidth * (aspectH / aspectW);
+
+        let col = 0;
+        for (let i = 1; i < columns; i++) {
+          if (colHeights[i] < colHeights[col]) col = i;
+        }
+
+        tile.style.width = `${colWidth}px`;
+        tile.style.height = `${height}px`;
+        tile.style.transform = `translate(${col * (colWidth + gapPx)}px, ${colHeights[col]}px)`;
+
+        colHeights[col] += height + gapPx;
+      });
+
+      container.style.height = `${Math.max(...colHeights) - gapPx}px`;
+      container.classList.add("is-animated-mosaic");
+    }
+
+    const layoutAll = () => containers.forEach(layout);
+    layoutAll();
+
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    window.addEventListener("resize", () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(layoutAll, 150);
+    });
+
+    containers.forEach((container) => {
+      container.addEventListener("mosaic:aspect-change", () => layout(container));
+    });
+  }
+
+  function init() {
     initMosaicCycling();
+    initMasonryLayout();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
   }
 </script>
