@@ -2,21 +2,32 @@
 import { Image } from "astro:assets";
 import { withBase } from "../lib/url";
 import type { CategoryCard } from "../lib/categoryCards";
+import { isVideo } from "../lib/galleryMedia";
 
 interface Props {
   category: CategoryCard;
 }
 
 const { category } = Astro.props;
+const coverIsVideo = isVideo(category.cover);
+const imgClass = ["category-card__img", category.isPortrait && "category-card__img--top"];
 ---
 
 <a href={withBase(`/work/${category.slug}`)} class="category-card">
-  <Image
-    src={category.cover.data.image}
-    alt={category.cover.data.alt}
-    width={800}
-    class:list={["category-card__img", category.isPortrait && "category-card__img--top"]}
-  />
+  {
+    coverIsVideo ? (
+      // A video's cover is a remote Vimeo thumbnail, not a local asset
+      // Astro's image pipeline can optimize, so it's a plain <img>.
+      <img src={category.cover.data.thumbnail} alt={category.cover.data.alt} class:list={imgClass} />
+    ) : (
+      <Image
+        src={category.cover.data.image!}
+        alt={category.cover.data.alt}
+        width={800}
+        class:list={imgClass}
+      />
+    )
+  }
   <span class="category-card__label">{category.label}</span>
 </a>
 

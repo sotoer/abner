@@ -1,5 +1,6 @@
 [
   { "slug": "portraits", "label": "Portraits", "order": 1 },
   { "slug": "architecture", "label": "Architecture", "order": 2 },
-  { "slug": "product", "label": "Product", "order": 3 }
+  { "slug": "product", "label": "Product", "order": 3 },
+  { "slug": "video", "label": "Video", "order": 4 }
 ]

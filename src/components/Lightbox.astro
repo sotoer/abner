@@ -15,6 +15,15 @@
     </button>
     <figure class="lightbox__figure">
       <img class="lightbox__image" id="lightbox-image" alt="" />
+      <div class="lightbox__video-wrap" id="lightbox-video-wrap" hidden>
+        <iframe
+          class="lightbox__video"
+          id="lightbox-video"
+          title=""
+          allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+          allowfullscreen
+        ></iframe>
+      </div>
       <figcaption class="lightbox__caption" id="lightbox-caption"></figcaption>
     </figure>
     <button type="button" class="lightbox__next" data-lightbox-next aria-label="Next image">
@@ -65,6 +74,22 @@
     max-width: 100%;
     max-height: 70vh;
     object-fit: contain;
+  }
+
+  .lightbox__video-wrap {
+    width: min(90vw, 1400px);
+    max-height: 70vh;
+    aspect-ratio: 16 / 9;
+  }
+
+  .lightbox__video-wrap[hidden] {
+    display: none;
+  }
+
+  .lightbox__video {
+    width: 100%;
+    height: 100%;
+    border: 0;
   }
 
   .lightbox__caption {
@@ -131,11 +156,15 @@
   function initLightbox() {
     const rootRaw = document.getElementById("lightbox");
     const imageRaw = document.getElementById("lightbox-image");
+    const videoWrapRaw = document.getElementById("lightbox-video-wrap");
+    const videoRaw = document.getElementById("lightbox-video");
     const captionRaw = document.getElementById("lightbox-caption");
     const filmstripRaw = document.getElementById("lightbox-filmstrip");
     if (
       !(rootRaw instanceof HTMLElement) ||
       !(imageRaw instanceof HTMLImageElement) ||
+      !(videoWrapRaw instanceof HTMLElement) ||
+      !(videoRaw instanceof HTMLIFrameElement) ||
       !(captionRaw instanceof HTMLElement) ||
       !(filmstripRaw instanceof HTMLElement)
     ) {
@@ -147,6 +176,8 @@
     // see the already-checked, precise element types.
     const root: HTMLElement = rootRaw;
     const imageEl: HTMLImageElement = imageRaw;
+    const videoWrapEl: HTMLElement = videoWrapRaw;
+    const videoEl: HTMLIFrameElement = videoRaw;
     const captionEl: HTMLElement = captionRaw;
     const filmstripEl: HTMLElement = filmstripRaw;
 
@@ -156,14 +187,30 @@
     if (triggers.length === 0) return;
 
     interface Slide {
-      src: string;
+      kind: "photo" | "video";
+      src?: string; // photo only
+      vimeoId?: string; // video only
+      thumbnail: string; // filmstrip still, either kind
       alt: string;
       caption: string;
     }
 
     function slideFor(el: HTMLElement): Slide {
+      const vimeoId = el.dataset.vimeoId;
+      if (vimeoId) {
+        return {
+          kind: "video",
+          vimeoId,
+          thumbnail: el.dataset.thumbnail || "",
+          alt: el.dataset.alt || "",
+          caption: el.dataset.caption || "",
+        };
+      }
+      const src = el.dataset.fullSrc || "";
       return {
-        src: el.dataset.fullSrc || "",
+        kind: "photo",
+        src,
+        thumbnail: el.dataset.thumbnail || src,
         alt: el.dataset.alt || "",
         caption: el.dataset.caption || "",
       };
@@ -198,7 +245,7 @@
       activeSlides.forEach((slide, i) => {
         const li = document.createElement("li");
         const img = document.createElement("img");
-        img.src = slide.src;
+        img.src = slide.thumbnail;
         img.alt = "";
         img.className = i === currentIndex ? "is-active" : "";
         li.appendChild(img);
@@ -210,9 +257,24 @@
     function show(index: number) {
       currentIndex = (index + activeSlides.length) % activeSlides.length;
       const slide = activeSlides[currentIndex];
-      imageEl.src = slide.src;
-      imageEl.alt = slide.alt;
       captionEl.textContent = slide.caption;
+
+      if (slide.kind === "video") {
+        imageEl.hidden = true;
+        videoWrapEl.hidden = false;
+        videoEl.src = `https://player.vimeo.com/video/${slide.vimeoId}`;
+        videoEl.title = slide.caption;
+      } else {
+        // Clearing the iframe's src (rather than just hiding it) stops
+        // playback — otherwise a video keeps running, audibly, behind
+        // whatever photo you navigate to next.
+        videoEl.src = "";
+        videoWrapEl.hidden = true;
+        imageEl.hidden = false;
+        imageEl.src = slide.src || "";
+        imageEl.alt = slide.alt;
+      }
+
       renderFilmstrip();
     }
 
@@ -227,6 +289,7 @@
     }
 
     function close() {
+      videoEl.src = ""; // stop playback rather than leaving it running hidden
       root.hidden = true;
       root.setAttribute("aria-hidden", "true");
       document.body.style.overflow = "";

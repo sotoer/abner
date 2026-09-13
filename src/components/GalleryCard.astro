@@ -1,19 +1,20 @@
 ---
-import { Image, getImage } from "astro:assets";
-import type { ImageMetadata } from "astro";
+import { Image } from "astro:assets";
+import type { GalleryEntry } from "../lib/galleryMedia";
+import { isVideo, toSlide } from "../lib/galleryMedia";
 
 interface Props {
-  image: ImageMetadata;
-  alt: string;
-  title: string;
+  entry: GalleryEntry;
   index: number;
 }
 
-const { image, alt, title, index } = Astro.props;
+const { entry, index } = Astro.props;
+const { title, alt } = entry.data;
+const video = isVideo(entry);
 
-// A larger render of the same source, used by the lightbox when this card
-// is clicked. The visible thumbnail below stays small/responsive.
-const full = await getImage({ src: image, width: 1600 });
+// The slide this card's lightbox trigger opens: a larger render of the
+// same photo, or the video's id (Lightbox embeds the actual player).
+const slide = await toSlide(entry);
 ---
 
 <button
@@ -21,12 +22,25 @@ const full = await getImage({ src: image, width: 1600 });
   class="gallery-card"
   data-lightbox-trigger
   data-index={index}
-  data-full-src={full.src}
   data-alt={alt}
   data-caption={title}
-  aria-label={`View ${title} full size`}
+  data-full-src={slide.src}
+  data-vimeo-id={slide.vimeoId}
+  data-thumbnail={slide.thumbnail}
+  aria-label={video ? `Play ${title}` : `View ${title} full size`}
 >
-  <Image src={image} alt={alt} width={700} loading="lazy" />
+  {
+    video ? (
+      <span class="gallery-card__video">
+        <img src={entry.data.thumbnail} alt={alt} loading="lazy" />
+        <span class="gallery-card__play" aria-hidden="true">
+          ▶
+        </span>
+      </span>
+    ) : (
+      <Image src={entry.data.image!} alt={alt} width={700} loading="lazy" />
+    )
+  }
 </button>
 
 <style>
@@ -47,5 +61,22 @@ const full = await getImage({ src: image, width: 1600 });
 
   .gallery-card:hover :global(img) {
     opacity: 0.85;
+  }
+
+  .gallery-card__video {
+    position: relative;
+    display: block;
+  }
+
+  .gallery-card__play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: #fff;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
   }
 </style>

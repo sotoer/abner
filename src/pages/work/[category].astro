@@ -32,14 +32,7 @@ const entries = allEntries
     <h1>{category.label}</h1>
     <MasonryGrid>
       {
-        entries.map((entry, i) => (
-          <GalleryCard
-            image={entry.data.image}
-            alt={entry.data.alt}
-            title={entry.data.title}
-            index={i}
-          />
-        ))
+        entries.map((entry, i) => <GalleryCard entry={entry} index={i} />)
       }
     </MasonryGrid>
   </section>
