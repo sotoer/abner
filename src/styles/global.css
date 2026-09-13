@@ -70,8 +70,13 @@ p {
 }
 
 /* CSS-columns masonry: simplest possible layout that still gives the
-   staggered look of the reference site without a JS masonry library. */
+   staggered look of the reference site without a JS masonry library.
+   `position: relative` is a no-op for this column layout itself, but
+   gives a positioning anchor for the JS-driven variant (see
+   CategoryGalleryCard's is-animated-mosaic) that replaces it on pages
+   whose tiles need to resize/reposition themselves at runtime. */
 .masonry {
+  position: relative;
   column-count: 1;
   column-gap: var(--space-2);
 }

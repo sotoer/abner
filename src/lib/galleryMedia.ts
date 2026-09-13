@@ -58,16 +58,32 @@ export async function toSlide(entry: GalleryEntry): Promise<Slide> {
   };
 }
 
+export interface Thumb {
+  src: string;
+  alt: string;
+  // The entry's aspect ratio (not the thumbnail render's own pixel size),
+  // so a client-side masonry layout can size a tile's box to match
+  // whichever photo/video it's currently showing.
+  width: number;
+  height: number;
+}
+
 // A small render for grid/mosaic thumbnails: an optimized local image for
 // a photo, or the video's own remote (already appropriately sized)
 // thumbnail — Astro's image pipeline only optimizes local project assets.
 export async function toThumb(
   entry: GalleryEntry,
   width: number,
-): Promise<{ src: string; alt: string }> {
+): Promise<Thumb> {
+  const { width: aspectW, height: aspectH } = getAspectRatio(entry);
   if (entry.data.vimeoId) {
-    return { src: entry.data.thumbnail!, alt: entry.data.alt };
+    return {
+      src: entry.data.thumbnail!,
+      alt: entry.data.alt,
+      width: aspectW,
+      height: aspectH,
+    };
   }
   const thumb = await getImage({ src: entry.data.image!, width });
-  return { src: thumb.src, alt: entry.data.alt };
+  return { src: thumb.src, alt: entry.data.alt, width: aspectW, height: aspectH };
 }
