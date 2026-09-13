@@ -4,9 +4,16 @@ import { getAspectRatio, toSlide, toThumb } from "../lib/galleryMedia";
 
 interface Props {
   category: CategoryCard;
+  // Which of this category's (up to 3) tiles to render. The homepage
+  // renders one tileIndex at a time across all categories, then the
+  // next, so tiles from different categories interleave in the mosaic's
+  // DOM order instead of each category's tiles landing in one solid
+  // block (which visually clustered categories together, since earlier
+  // DOM order lands higher up in the packed layout).
+  tileIndex: number;
 }
 
-const { category } = Astro.props;
+const { category, tileIndex } = Astro.props;
 
 // Full-size (or video-id) slides for the lightbox — clicking any of this
 // category's mosaic tiles opens the whole gallery, not just whatever
@@ -25,21 +32,24 @@ const thumbs = await Promise.all(
 );
 const thumbsJson = JSON.stringify(thumbs);
 
-// Three tiles, seeded with (up to) three different entries so the mosaic
-// isn't three identical boxes before client JS randomizes them on load.
+// This tile's seed: (up to) three different entries per category so the
+// mosaic isn't identical boxes before client JS randomizes them on load.
 // The inline aspect-ratio below is only the pre-JS fallback (and the
 // starting point for the layout script) — client JS resizes the tile as
-// its cycling swaps in photos of other shapes.
+// its cycling swaps in photos of other shapes. A category with fewer
+// than 3 entries simply renders fewer tiles (seed is null past its count).
 const seedCount = Math.min(3, thumbs.length);
-const tileSeeds = Array.from({ length: 3 }, (_, i) => {
-  const entry = category.entries[i % category.entries.length];
-  const thumb = thumbs[i % thumbs.length];
-  return { thumb, ...getAspectRatio(entry) };
-}).slice(0, seedCount);
+const seed =
+  tileIndex < seedCount
+    ? {
+        thumb: thumbs[tileIndex % thumbs.length],
+        ...getAspectRatio(category.entries[tileIndex % category.entries.length]),
+      }
+    : null;
 ---
 
 {
-  tileSeeds.map((seed) => (
+  seed && (
     <button
       type="button"
       class="category-mosaic-card"
@@ -60,7 +70,7 @@ const tileSeeds = Array.from({ length: 3 }, (_, i) => {
       />
       <img class="category-mosaic-card__img" alt="" />
     </button>
-  ))
+  )
 }
 
 <style>
