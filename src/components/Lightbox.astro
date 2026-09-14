@@ -306,7 +306,11 @@
       if (groupFor(el)) {
         el.addEventListener("click", () => {
           const group = groupFor(el);
-          if (group) open(group, 0);
+          // Open on the exact photo the trigger is currently showing
+          // (data-slide-index, kept in sync as a homepage mosaic tile
+          // cycles) — same behavior as clicking a photo on
+          // /work/[category] — rather than always the gallery's start.
+          if (group) open(group, Number(el.dataset.slideIndex) || 0);
         });
       } else {
         const index = pageSlideIndex++;
