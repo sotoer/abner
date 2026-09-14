@@ -1,9 +1,9 @@
 ---
-title: "Andis Wines: Women in Wine"
+title: "Capricho"
 category: "video"
 order: 5
-alt: "Woman standing among oak wine barrels at Andis Wines"
+alt: "Close-up of dark packaging with a gold foil Capricho script logo"
 featured: false
-vimeoId: "1222865876"
-thumbnail: "https://i.vimeocdn.com/video/2195935750-1e8628c99d6f428b402cdf89f1ea7239d02a9dbd2e0c604ede7f394ca3ccc092-d_960?region=us"
+vimeoId: "1222869118"
+thumbnail: "https://i.vimeocdn.com/video/2195938910-c0949dc0414c5f5f2c3a0981a37ab591dca2279628f9d533a148f3253c21463e-d_960?region=us"
 ---

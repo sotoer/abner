@@ -1,9 +1,9 @@
 ---
-title: "Production Reel"
+title: "Beyond Meat: Burger"
 category: "video"
 order: 9
-alt: "Aerial view of coastal buildings with Abner Soto Production Reel title text"
+alt: "Man smiling while eating a burger outdoors, surrounded by Beyond Meat products"
 featured: false
-vimeoId: "1193330217"
-thumbnail: "https://i.vimeocdn.com/video/2158773910-e0d668d818099f42760e4adde74724a3a3282bbf10d269f72cb8d399140f3e17-d_960?region=us"
+vimeoId: "1194562920"
+thumbnail: "https://i.vimeocdn.com/video/2195936586-ee938f26a7e79ae06446500f82be92df57447430be4e46b2b7689ff02a51480e-d_960?region=us"
 ---
