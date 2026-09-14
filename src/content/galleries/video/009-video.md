@@ -1,9 +1,9 @@
 ---
-title: "Beyond Meat: Burger"
+title: "World Market: Pannetone Recipe"
 category: "video"
 order: 9
-alt: "Man smiling while eating a burger outdoors, surrounded by Beyond Meat products"
+alt: "Overhead shot of a baked panettone bread pudding dusted with powdered sugar, holiday table setting"
 featured: false
-vimeoId: "1194562920"
-thumbnail: "https://i.vimeocdn.com/video/2195936586-ee938f26a7e79ae06446500f82be92df57447430be4e46b2b7689ff02a51480e-d_960?region=us"
+vimeoId: "640134015"
+thumbnail: "https://i.vimeocdn.com/video/1287447605-b08f273762bc633cd6cd937bb5286d9d5c4515ec5ea0b88e9_960?region=us"
 ---

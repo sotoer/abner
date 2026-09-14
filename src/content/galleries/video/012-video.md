@@ -1,9 +1,9 @@
 ---
-title: "Downton Abbey Cocktail"
+title: "Capricho"
 category: "video"
 order: 12
-alt: "Two craft cocktails garnished with lavender on a marble and brass tray"
+alt: "Close-up of dark packaging with a gold foil Capricho script logo"
 featured: false
-vimeoId: "640133825"
-thumbnail: "https://i.vimeocdn.com/video/1287449888-aeb67885fa26e02baf2e2ccbb18ea3161db6a207653c751a9_960?region=us"
+vimeoId: "1222869118"
+thumbnail: "https://i.vimeocdn.com/video/2195938910-c0949dc0414c5f5f2c3a0981a37ab591dca2279628f9d533a148f3253c21463e-d_960?region=us"
 ---
