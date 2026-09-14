@@ -34,10 +34,15 @@ const categoryThumbs = await Promise.all(
     );
     return {
       category,
-      thumbs: thumbs.map((thumb) => ({
+      // index is this thumb's position in the category's own slides
+      // array (built in the same order above), so a click can open the
+      // lightbox on the exact photo/video the tile is showing — same as
+      // clicking a photo on /work/[category] — rather than always at 0.
+      thumbs: thumbs.map((thumb, index) => ({
         ...thumb,
         category: category.slug,
         categoryLabel: category.label,
+        index,
       })),
     };
   }),
@@ -84,6 +89,7 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
             height={seed.thumb.height}
             categoryLabel={seed.categoryLabel}
             initialSlidesJson={seed.initialSlidesJson}
+            initialSlideIndex={seed.thumb.index}
           />
         ))
       }

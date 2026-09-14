@@ -17,10 +17,22 @@ interface Props {
   // both as the pre-JS/first-paint fallback and as the starting point
   // the cycling script's aria-label/data-slides swap out from.
   initialSlidesJson: string;
+  // This seed photo's position within initialSlidesJson, so a click
+  // opens the lightbox on the exact photo the tile is showing — same
+  // behavior as clicking a photo on /work/[category] — rather than
+  // always at the start of the gallery.
+  initialSlideIndex: number;
 }
 
-const { thumbSrc, thumbAlt, width, height, categoryLabel, initialSlidesJson } =
-  Astro.props;
+const {
+  thumbSrc,
+  thumbAlt,
+  width,
+  height,
+  categoryLabel,
+  initialSlidesJson,
+  initialSlideIndex,
+} = Astro.props;
 ---
 
 <button
@@ -28,6 +40,7 @@ const { thumbSrc, thumbAlt, width, height, categoryLabel, initialSlidesJson } =
   class="category-mosaic-card"
   data-lightbox-trigger
   data-slides={initialSlidesJson}
+  data-slide-index={initialSlideIndex}
   data-aspect-w={width}
   data-aspect-h={height}
   aria-label={`View the ${categoryLabel} gallery`}
@@ -94,6 +107,9 @@ const { thumbSrc, thumbAlt, width, height, categoryLabel, initialSlidesJson } =
     height: number;
     category: string;
     categoryLabel: string;
+    // This thumb's position in its own category's slides array, so a
+    // click can open the lightbox on the exact photo shown.
+    index: number;
   }
 
   interface Slide {
@@ -195,6 +211,7 @@ const { thumbSrc, thumbAlt, width, height, categoryLabel, initialSlidesJson } =
       // to match (the masonry layout listens for this event).
       const slides = slidesByCategory[thumb.category];
       if (slides) state.el.dataset.slides = JSON.stringify(slides);
+      state.el.dataset.slideIndex = String(thumb.index);
       state.el.setAttribute("aria-label", `View the ${thumb.categoryLabel} gallery`);
       state.el.dataset.aspectW = String(thumb.width);
       state.el.dataset.aspectH = String(thumb.height);
