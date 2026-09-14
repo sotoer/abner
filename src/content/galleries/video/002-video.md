@@ -1,9 +1,9 @@
 ---
-title: "Emily"
+title: "Kris Adams Real Estate"
 category: "video"
 order: 2
-alt: "Woman standing in a softly lit kitchen, testimonial-style video"
+alt: "Man being interviewed while seated on a porch, for a Kris Adams Real Estate video"
 featured: false
-vimeoId: "1222871899"
-thumbnail: "https://i.vimeocdn.com/video/2195942232-4031932be4674b7bd77169dd8a4371364f917dc96a3165f5313f4790ac341c86-d_960?region=us"
+vimeoId: "1222872721"
+thumbnail: "https://i.vimeocdn.com/video/2195943125-5e1f086e52ffb2ed2fdecac44c9e5351e2f382ed93d59844403bd1bba5f70ba4-d_960?region=us"
 ---
