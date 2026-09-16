@@ -1,4 +1,7 @@
 ---
+import { getImage } from "astro:assets";
+import headshot from "../assets/about-headshot.jpg";
+
 interface Props {
   title: string;
   description?: string;
@@ -8,6 +11,19 @@ const siteTitle = "Abner Soto Multimedia Producer";
 const { title, description = "A photography portfolio by Abner Soto." } =
   Astro.props;
 const fullTitle = title === siteTitle ? title : `${title} — ${siteTitle}`;
+
+// The image a link to the site shows in previews (iMessage, Slack,
+// social platforms, ...). Site-wide rather than per-page, since there's
+// no dedicated share-image per page — without this, some crawlers fall
+// back to the first <img> they find on the page, which on the homepage
+// is whatever the mosaic happens to seed first.
+const OG_IMAGE_SIZE = 1200;
+const ogImage = await getImage({
+  src: headshot,
+  width: OG_IMAGE_SIZE,
+  height: OG_IMAGE_SIZE,
+});
+const ogImageUrl = new URL(ogImage.src, Astro.site).toString();
 ---
 
 <title>{fullTitle}</title>
@@ -15,3 +31,8 @@ const fullTitle = title === siteTitle ? title : `${title} — ${siteTitle}`;
 <meta property="og:title" content={fullTitle} />
 <meta property="og:description" content={description} />
 <meta property="og:type" content="website" />
+<meta property="og:image" content={ogImageUrl} />
+<meta property="og:image:width" content={String(OG_IMAGE_SIZE)} />
+<meta property="og:image:height" content={String(OG_IMAGE_SIZE)} />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:image" content={ogImageUrl} />
