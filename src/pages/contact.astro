@@ -11,7 +11,11 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       discuss how we might collaborate.
     </p>
 
-    <!-- TODO: wire this form to Netlify Forms or Formspree once a backend is chosen -->
+    <!-- TODO: wire this form to Netlify Forms or Formspree once a backend is chosen.
+         Whichever it is, have it reject a submission where the honeypot field
+         below is non-empty — the JS guard here only stops simple bots that
+         still execute page scripts; a bot posting straight to the endpoint
+         skips it entirely, so the real check has to happen server-side. -->
     <form class="contact__form" action="#" method="post">
       <label>
         Name
@@ -24,6 +28,15 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       <label>
         Message
         <textarea name="message" rows="5" required></textarea>
+      </label>
+      <!-- Honeypot: hidden from sighted users (off-screen) and screen
+           readers (aria-hidden + removed from tab order), but present in
+           the raw HTML for simple bots that fill in every field to find
+           and fill. A human never sees or reaches it, so any submission
+           with this non-empty is spam. -->
+      <label class="contact__hp" aria-hidden="true">
+        Company
+        <input type="text" name="company" tabindex="-1" autocomplete="off" />
       </label>
       <button type="submit">Send</button>
     </form>
@@ -88,4 +101,34 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     background: var(--color-text);
     color: var(--color-bg);
   }
+
+  /* Off-screen rather than display:none/visibility:hidden — some spam
+     bots specifically skip fields hidden that way, which would defeat
+     the honeypot. This must NOT reuse a generic .visually-hidden
+     utility: that pattern intentionally stays in the accessibility
+     tree for screen readers, which would expose this field to (and
+     risk being filled in by) real assistive-tech users. */
+  .contact__hp {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
 </style>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>(".contact__form");
+  const honeypot = form?.querySelector<HTMLInputElement>('[name="company"]');
+
+  form?.addEventListener("submit", (e) => {
+    // A human never sees or fills this field, so a non-empty value means
+    // a bot filled in every input it could find — silently drop the
+    // submission. Only stops bots that execute page JS; the form's
+    // eventual backend still needs to reject this server-side too (see
+    // the TODO above).
+    if (honeypot?.value) {
+      e.preventDefault();
+    }
+  });
+</script>
