@@ -1,5 +1,12 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+
+// Set PUBLIC_RECAPTCHA_SITE_KEY (see .env.example) to turn on the
+// reCAPTCHA widget below. Left unset, the form just renders without it
+// (still protected by the honeypot alone) rather than shipping a widget
+// pointed at a fake key, which Google would render as a visible error
+// for every visitor.
+const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
 ---
 
 <BaseLayout title="Contact" description="Get in touch — placeholder contact form.">
@@ -12,10 +19,13 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     </p>
 
     <!-- TODO: wire this form to Netlify Forms or Formspree once a backend is chosen.
-         Whichever it is, have it reject a submission where the honeypot field
-         below is non-empty — the JS guard here only stops simple bots that
-         still execute page scripts; a bot posting straight to the endpoint
-         skips it entirely, so the real check has to happen server-side. -->
+         Whichever it is: have it reject a submission where the honeypot field
+         below is non-empty, and — once PUBLIC_RECAPTCHA_SITE_KEY is set — verify
+         the g-recaptcha-response token server-side with the matching SECRET key
+         via https://www.google.com/recaptcha/api/siteverify. Both JS guards here
+         only stop bots that execute page scripts; one posting straight to the
+         endpoint skips them entirely, so the real checks have to happen
+         server-side. -->
     <form class="contact__form" action="#" method="post">
       <label>
         Name
@@ -38,9 +48,23 @@ import BaseLayout from "../layouts/BaseLayout.astro";
         Company
         <input type="text" name="company" tabindex="-1" autocomplete="off" />
       </label>
+      {
+        recaptchaSiteKey && (
+          <div class="g-recaptcha" data-sitekey={recaptchaSiteKey} />
+        )
+      }
+      <p class="contact__error" role="alert" hidden>
+        Please confirm you're not a robot before sending.
+      </p>
       <button type="submit">Send</button>
     </form>
   </section>
+
+  {
+    recaptchaSiteKey && (
+      <script is:inline src="https://www.google.com/recaptcha/api.js" async defer />
+    )
+  }
 </BaseLayout>
 
 <style>
@@ -115,11 +139,21 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     height: 1px;
     overflow: hidden;
   }
+
+  .contact__error {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-accent);
+  }
 </style>
 
 <script>
+  declare const grecaptcha: { getResponse(): string } | undefined;
+
   const form = document.querySelector<HTMLFormElement>(".contact__form");
   const honeypot = form?.querySelector<HTMLInputElement>('[name="company"]');
+  const recaptcha = form?.querySelector<HTMLElement>(".g-recaptcha");
+  const errorEl = form?.querySelector<HTMLElement>(".contact__error");
 
   form?.addEventListener("submit", (e) => {
     // A human never sees or fills this field, so a non-empty value means
@@ -129,6 +163,20 @@ import BaseLayout from "../layouts/BaseLayout.astro";
     // the TODO above).
     if (honeypot?.value) {
       e.preventDefault();
+      return;
+    }
+
+    // If the widget's on the page, require it to be completed. If
+    // Google's script hasn't loaded (e.g. blocked in the visitor's
+    // region), grecaptcha is undefined — let the submission through
+    // rather than locking out a real visitor over a third-party script
+    // failing to load; the honeypot and server-side checks still apply.
+    if (recaptcha && typeof grecaptcha !== "undefined") {
+      const completed = grecaptcha.getResponse().length > 0;
+      errorEl?.toggleAttribute("hidden", completed);
+      if (!completed) {
+        e.preventDefault();
+      }
     }
   });
 </script>
