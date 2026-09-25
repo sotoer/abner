@@ -78,7 +78,6 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
   </section>
 
   <section class="featured container">
-    <h2>Featured work</h2>
     <MasonryGrid data-mosaic-pool={allThumbsJson} data-mosaic-slides={slidesBySlugJson}>
       {
         tileSeeds.map((seed) => (
@@ -128,13 +127,5 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
 
   .featured {
     padding-bottom: var(--space-6);
-  }
-
-  .featured h2 {
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 0.9rem;
-    color: var(--color-text-muted);
-    margin-bottom: var(--space-3);
   }
 </style>
