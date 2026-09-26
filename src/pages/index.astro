@@ -181,6 +181,10 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     // Eased 0-1 toward 1 while the cursor is over this shape, toward 0
     // otherwise — drives a brightened, bolder highlight in draw().
     hoverAmount: number;
+    // Most shapes bounce off the edges forever (existing behavior). A
+    // minority instead pass straight through and get removed once fully
+    // offscreen — see the population-management block in step().
+    bounces: boolean;
   }
 
   function initHeroKineticBackground() {
@@ -256,39 +260,55 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     let trail: TrailPoint[] = [];
     let trailOwner: Circle | null = null;
 
+    // Population management for the non-bouncing shapes that pass through
+    // the edge and get removed (see step()): targetCount is the steady
+    // -state total, and respawnFrames tracks a delay before each removed
+    // shape is replaced so the total can dip below target for a bit
+    // rather than snapping back instantly — capped at
+    // MAX_POPULATION_DIP so the count never strays more than that from
+    // targetCount.
+    let targetCount = 0;
+    let respawnFrames: number[] = [];
+    const MAX_POPULATION_DIP = 3;
+
+    function spawnCircle(): Circle {
+      // Roughly a third of shapes start as angular polygons (3-6 sides),
+      // the rest as circles — each will go on to morph between shapes on
+      // its own staggered cycle regardless of where it starts.
+      const sides = Math.random() < 0.35 ? 3 + Math.floor(Math.random() * 4) : 0;
+      const idleFrames = randomIdleFrames();
+      return {
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.45,
+        vy: (Math.random() - 0.5) * 0.45,
+        r: 18 + Math.random() * 46,
+        // Varying these per circle (hairline/faint vs. bold/solid) is
+        // what reads as a technical schematic rather than uniform,
+        // cartoonish bubbles — mimics different "layers" of emphasis on
+        // a diagram.
+        lineWidth: 0.5 + Math.random() * 2,
+        opacity: 0.05 + Math.random() * 0.12, // max stays below the 0.175 flat value set earlier
+        sides,
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.01,
+        morphing: false,
+        fromSides: sides,
+        toSides: sides,
+        // Pre-randomized within the idle window so shapes don't all
+        // start their morph cycles in sync.
+        morphTimer: Math.random() * idleFrames,
+        idleFrames,
+        hoverAmount: 0,
+        // Most shapes bounce; a minority pass through the edge instead.
+        bounces: Math.random() < 0.65,
+      };
+    }
+
     function seedCircles() {
-      const count = Math.max(6, Math.round((width * height) / 65000));
-      circles = Array.from({ length: count }, () => {
-        // Roughly a third of shapes start as angular polygons (3-6
-        // sides), the rest as circles — each will go on to morph between
-        // shapes on its own staggered cycle regardless of where it starts.
-        const sides = Math.random() < 0.35 ? 3 + Math.floor(Math.random() * 4) : 0;
-        const idleFrames = randomIdleFrames();
-        return {
-          x: Math.random() * width,
-          y: Math.random() * height,
-          vx: (Math.random() - 0.5) * 0.45,
-          vy: (Math.random() - 0.5) * 0.45,
-          r: 18 + Math.random() * 46,
-          // Varying these per circle (hairline/faint vs. bold/solid) is
-          // what reads as a technical schematic rather than uniform,
-          // cartoonish bubbles — mimics different "layers" of emphasis on
-          // a diagram.
-          lineWidth: 0.5 + Math.random() * 2,
-          opacity: 0.05 + Math.random() * 0.12, // max stays below the 0.175 flat value set earlier
-          sides,
-          rotation: Math.random() * Math.PI * 2,
-          rotationSpeed: (Math.random() - 0.5) * 0.01,
-          morphing: false,
-          fromSides: sides,
-          toSides: sides,
-          // Pre-randomized within the idle window so shapes don't all
-          // start their morph cycles in sync.
-          morphTimer: Math.random() * idleFrames,
-          idleFrames,
-          hoverAmount: 0,
-        };
-      });
+      targetCount = Math.max(6, Math.round((width * height) / 65000));
+      circles = Array.from({ length: targetCount }, spawnCircle);
+      respawnFrames = [];
     }
 
     function resize() {
@@ -359,24 +379,68 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
           c.idleFrames = randomIdleFrames();
         }
 
-        if (c.x - c.r < 0) {
-          c.x = c.r;
-          c.vx = Math.abs(c.vx);
-        } else if (c.x + c.r > width) {
-          c.x = width - c.r;
-          c.vx = -Math.abs(c.vx);
-        }
-        if (c.y - c.r < 0) {
-          c.y = c.r;
-          c.vy = Math.abs(c.vy);
-        } else if (c.y + c.r > height) {
-          c.y = height - c.r;
-          c.vy = -Math.abs(c.vy);
+        if (c.bounces) {
+          if (c.x - c.r < 0) {
+            c.x = c.r;
+            c.vx = Math.abs(c.vx);
+          } else if (c.x + c.r > width) {
+            c.x = width - c.r;
+            c.vx = -Math.abs(c.vx);
+          }
+          if (c.y - c.r < 0) {
+            c.y = c.r;
+            c.vy = Math.abs(c.vy);
+          } else if (c.y + c.r > height) {
+            c.y = height - c.r;
+            c.vy = -Math.abs(c.vy);
+          }
         }
       }
       for (let i = 0; i < circles.length; i++) {
         for (let j = i + 1; j < circles.length; j++) {
           resolveCollision(circles[i], circles[j]);
+        }
+      }
+
+      // Non-bouncing shapes that have fully left the visible area
+      // disappear instead of reflecting. Each is eventually replaced —
+      // immediately if the population has already dipped by
+      // MAX_POPULATION_DIP, otherwise after a random delay — so the
+      // total count stays within that many of targetCount rather than
+      // snapping straight back.
+      const survivors: Circle[] = [];
+      let removed = 0;
+      for (const c of circles) {
+        const offscreen =
+          !c.bounces &&
+          (c.x + c.r < 0 ||
+            c.x - c.r > width ||
+            c.y + c.r < 0 ||
+            c.y - c.r > height);
+        if (offscreen) {
+          removed++;
+        } else {
+          survivors.push(c);
+        }
+      }
+      circles = survivors;
+      for (let i = 0; i < removed; i++) {
+        // Deliberately ignores respawnFrames.length: a queued-but-not-yet-
+        // spawned replacement doesn't help anyone looking at the screen
+        // right now, so only the actually-visible count should gate the
+        // dip cap, not the count "on paper."
+        const visibleDeficit = targetCount - circles.length;
+        if (visibleDeficit >= MAX_POPULATION_DIP) {
+          circles.push(spawnCircle());
+        } else {
+          respawnFrames.push(30 + Math.random() * 120); // 0.5-2.5s @ 60fps
+        }
+      }
+      for (let i = respawnFrames.length - 1; i >= 0; i--) {
+        respawnFrames[i]--;
+        if (respawnFrames[i] <= 0) {
+          circles.push(spawnCircle());
+          respawnFrames.splice(i, 1);
         }
       }
 
