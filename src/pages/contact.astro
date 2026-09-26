@@ -26,7 +26,12 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
          only stop bots that execute page scripts; one posting straight to the
          endpoint skips them entirely, so the real checks have to happen
          server-side. -->
-    <form class="contact__form" action="#" method="post">
+    <form
+      class="contact__form"
+      action="#"
+      method="post"
+      data-recaptcha-site-key={recaptchaSiteKey}
+    >
       <label>
         Name
         <input type="text" name="name" required />
@@ -50,19 +55,21 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
       </label>
       {
         recaptchaSiteKey && (
-          <div class="g-recaptcha" data-sitekey={recaptchaSiteKey} />
+          <input type="hidden" name="g-recaptcha-response" />
         )
       }
-      <p class="contact__error" role="alert" hidden>
-        Please confirm you're not a robot before sending.
-      </p>
       <button type="submit">Send</button>
     </form>
   </section>
 
   {
     recaptchaSiteKey && (
-      <script is:inline src="https://www.google.com/recaptcha/api.js" async defer />
+      <script
+        is:inline
+        src={`https://www.google.com/recaptcha/api.js?render=${recaptchaSiteKey}`}
+        async
+        defer
+      />
     )
   }
 </BaseLayout>
@@ -139,21 +146,26 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
     height: 1px;
     overflow: hidden;
   }
-
-  .contact__error {
-    margin: 0;
-    font-size: 0.85rem;
-    color: var(--color-accent);
-  }
 </style>
 
 <script>
-  declare const grecaptcha: { getResponse(): string } | undefined;
+  declare const grecaptcha:
+    | {
+        ready(callback: () => void): void;
+        execute(siteKey: string, options: { action: string }): Promise<string>;
+      }
+    | undefined;
 
   const form = document.querySelector<HTMLFormElement>(".contact__form");
   const honeypot = form?.querySelector<HTMLInputElement>('[name="company"]');
-  const recaptcha = form?.querySelector<HTMLElement>(".g-recaptcha");
-  const errorEl = form?.querySelector<HTMLElement>(".contact__error");
+  const siteKey = form?.dataset.recaptchaSiteKey;
+  const tokenField =
+    form?.querySelector<HTMLInputElement>('[name="g-recaptcha-response"]');
+
+  // v3 is invisible — no checkbox to complete, just a token fetched right
+  // before submit — so once it's attached this flag lets the resubmit
+  // through instead of re-fetching a token forever.
+  let hasToken = false;
 
   form?.addEventListener("submit", (e) => {
     // A human never sees or fills this field, so a non-empty value means
@@ -166,17 +178,32 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
       return;
     }
 
-    // If the widget's on the page, require it to be completed. If
-    // Google's script hasn't loaded (e.g. blocked in the visitor's
+    if (!siteKey || hasToken) return;
+
+    e.preventDefault();
+
+    // If Google's script hasn't loaded (e.g. blocked in the visitor's
     // region), grecaptcha is undefined — let the submission through
     // rather than locking out a real visitor over a third-party script
     // failing to load; the honeypot and server-side checks still apply.
-    if (recaptcha && typeof grecaptcha !== "undefined") {
-      const completed = grecaptcha.getResponse().length > 0;
-      errorEl?.toggleAttribute("hidden", completed);
-      if (!completed) {
-        e.preventDefault();
-      }
+    if (typeof grecaptcha === "undefined") {
+      form?.submit();
+      return;
     }
+
+    grecaptcha.ready(() => {
+      grecaptcha
+        .execute(siteKey, { action: "contact" })
+        .then((token) => {
+          if (tokenField) tokenField.value = token;
+          hasToken = true;
+          form?.requestSubmit();
+        })
+        .catch(() => {
+          // Same reasoning as the script-blocked case above: don't lock a
+          // real visitor out over a failed background token fetch.
+          form?.submit();
+        });
+    });
   });
 </script>
