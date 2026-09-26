@@ -168,6 +168,19 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     sides: number;
     rotation: number;
     rotationSpeed: number;
+    // Each shape alternates between an idle phase (holding `sides`) and a
+    // morph phase (smoothly reshaping from `fromSides` to `toSides`).
+    // idleFrames/MORPH_FRAMES are sized so only ~20% of shapes are
+    // mid-morph at any moment, and morphTimer starts pre-randomized so
+    // shapes don't all start their cycles in lockstep.
+    morphing: boolean;
+    fromSides: number;
+    toSides: number;
+    morphTimer: number;
+    idleFrames: number;
+    // Eased 0-1 toward 1 while the cursor is over this shape, toward 0
+    // otherwise — drives a brightened, bolder highlight in draw().
+    hoverAmount: number;
   }
 
   function initHeroKineticBackground() {
@@ -185,29 +198,97 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     const SHAPE_COLOR = "26, 26, 26";
     const LINE_COLOR = "26, 26, 26";
 
+    // Assuming ~60fps: a 2s morph with an average 8s idle gap between
+    // morphs works out to ~120 / (120 + 480) = 20% of shapes mid-morph
+    // at any moment, on average, once many shapes are running staggered,
+    // independently-timed cycles.
+    const MORPH_FRAMES = 120;
+    const IDLE_FRAMES_MIN = 360;
+    const IDLE_FRAMES_MAX = 600;
+    const SHAPE_OPTIONS = [0, 3, 4, 5, 6]; // 0 = circle, 3-6 = polygon sides
+
+    function randomIdleFrames() {
+      return (
+        IDLE_FRAMES_MIN + Math.random() * (IDLE_FRAMES_MAX - IDLE_FRAMES_MIN)
+      );
+    }
+
+    function randomOtherShape(current: number) {
+      const options = SHAPE_OPTIONS.filter((s) => s !== current);
+      return options[Math.floor(Math.random() * options.length)];
+    }
+
+    function easeInOutCubic(t: number) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    // Distance from center to a regular polygon's boundary at a given
+    // angle (relative to the shape's own rotation) — constant (the
+    // circle's radius) when sides is 0. Sampling this at many angles is
+    // what lets a shape morph smoothly between different side counts (or
+    // to/from a circle): interpolate the radius per-angle, not the shape
+    // outright.
+    function shapeRadiusAt(theta: number, sides: number, r: number) {
+      if (sides < 3) return r;
+      const segment = (Math.PI * 2) / sides;
+      const local = ((theta % segment) + segment) % segment - segment / 2;
+      return (r * Math.cos(Math.PI / sides)) / Math.cos(local);
+    }
+
     let width = 0;
     let height = 0;
     let circles: Circle[] = [];
+    let mouseX: number | null = null;
+    let mouseY: number | null = null;
+
+    // Ghost trail: recent positions/forms of whichever shape is currently
+    // hovered, oldest first, rendered faintest to most recent. Decays by
+    // dropping its oldest entry each frame once nothing is hovered, so it
+    // shortens away rather than vanishing abruptly.
+    interface TrailPoint {
+      x: number;
+      y: number;
+      r: number;
+      sides: number;
+      rotation: number;
+    }
+    const TRAIL_MAX_LENGTH = 16;
+    let trail: TrailPoint[] = [];
+    let trailOwner: Circle | null = null;
 
     function seedCircles() {
       const count = Math.max(6, Math.round((width * height) / 65000));
-      circles = Array.from({ length: count }, () => ({
-        x: Math.random() * width,
-        y: Math.random() * height,
-        vx: (Math.random() - 0.5) * 0.45,
-        vy: (Math.random() - 0.5) * 0.45,
-        r: 18 + Math.random() * 46,
-        // Varying these per circle (hairline/faint vs. bold/solid) is what
-        // reads as a technical schematic rather than uniform, cartoonish
-        // bubbles — mimics different "layers" of emphasis on a diagram.
-        lineWidth: 0.5 + Math.random() * 2,
-        opacity: 0.05 + Math.random() * 0.12, // max stays below the 0.175 flat value set earlier
-        // Roughly a third of shapes are angular polygons (3-6 sides)
-        // mixed in among the circles, for a more faceted, less bubbly look.
-        sides: Math.random() < 0.35 ? 3 + Math.floor(Math.random() * 4) : 0,
-        rotation: Math.random() * Math.PI * 2,
-        rotationSpeed: (Math.random() - 0.5) * 0.01,
-      }));
+      circles = Array.from({ length: count }, () => {
+        // Roughly a third of shapes start as angular polygons (3-6
+        // sides), the rest as circles — each will go on to morph between
+        // shapes on its own staggered cycle regardless of where it starts.
+        const sides = Math.random() < 0.35 ? 3 + Math.floor(Math.random() * 4) : 0;
+        const idleFrames = randomIdleFrames();
+        return {
+          x: Math.random() * width,
+          y: Math.random() * height,
+          vx: (Math.random() - 0.5) * 0.45,
+          vy: (Math.random() - 0.5) * 0.45,
+          r: 18 + Math.random() * 46,
+          // Varying these per circle (hairline/faint vs. bold/solid) is
+          // what reads as a technical schematic rather than uniform,
+          // cartoonish bubbles — mimics different "layers" of emphasis on
+          // a diagram.
+          lineWidth: 0.5 + Math.random() * 2,
+          opacity: 0.05 + Math.random() * 0.12, // max stays below the 0.175 flat value set earlier
+          sides,
+          rotation: Math.random() * Math.PI * 2,
+          rotationSpeed: (Math.random() - 0.5) * 0.01,
+          morphing: false,
+          fromSides: sides,
+          toSides: sides,
+          // Pre-randomized within the idle window so shapes don't all
+          // start their morph cycles in sync.
+          morphTimer: Math.random() * idleFrames,
+          idleFrames,
+          hoverAmount: 0,
+        };
+      });
     }
 
     function resize() {
@@ -250,10 +331,34 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     }
 
     function step() {
+      let currentHoveredCircle: Circle | null = null;
       for (const c of circles) {
         c.x += c.vx;
         c.y += c.vy;
         c.rotation += c.rotationSpeed;
+
+        const hovered =
+          mouseX !== null &&
+          mouseY !== null &&
+          Math.hypot(c.x - mouseX, c.y - mouseY) < c.r;
+        if (hovered) currentHoveredCircle = c;
+        c.hoverAmount += ((hovered ? 1 : 0) - c.hoverAmount) * 0.15;
+
+        c.morphTimer++;
+        if (!c.morphing) {
+          if (c.morphTimer >= c.idleFrames) {
+            c.morphing = true;
+            c.morphTimer = 0;
+            c.fromSides = c.sides;
+            c.toSides = randomOtherShape(c.sides);
+          }
+        } else if (c.morphTimer >= MORPH_FRAMES) {
+          c.morphing = false;
+          c.morphTimer = 0;
+          c.sides = c.toSides;
+          c.idleFrames = randomIdleFrames();
+        }
+
         if (c.x - c.r < 0) {
           c.x = c.r;
           c.vx = Math.abs(c.vx);
@@ -273,6 +378,24 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
         for (let j = i + 1; j < circles.length; j++) {
           resolveCollision(circles[i], circles[j]);
         }
+      }
+
+      if (currentHoveredCircle) {
+        if (trailOwner !== currentHoveredCircle) {
+          trail = [];
+          trailOwner = currentHoveredCircle;
+        }
+        trail.push({
+          x: currentHoveredCircle.x,
+          y: currentHoveredCircle.y,
+          r: currentHoveredCircle.r,
+          sides: currentHoveredCircle.sides,
+          rotation: currentHoveredCircle.rotation,
+        });
+        if (trail.length > TRAIL_MAX_LENGTH) trail.shift();
+      } else if (trail.length > 0) {
+        trail.shift();
+        if (trail.length === 0) trailOwner = null;
       }
     }
 
@@ -295,11 +418,60 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
         }
       }
 
-      for (const c of circles) {
-        ctx!.strokeStyle = `rgba(${SHAPE_COLOR}, ${c.opacity})`;
-        ctx!.lineWidth = c.lineWidth;
+      // Ghost trail for the hovered shape: oldest entries faintest, drawn
+      // before the live shapes so the real, brightest copy ends up on top.
+      const TRAIL_MAX_ALPHA = 0.14;
+      trail.forEach((p, i) => {
+        const alpha = TRAIL_MAX_ALPHA * ((i + 1) / trail.length);
+        ctx!.strokeStyle = `rgba(${SHAPE_COLOR}, ${alpha})`;
+        ctx!.lineWidth = 1;
         ctx!.beginPath();
-        if (c.sides === 0) {
+        if (p.sides < 3) {
+          ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        } else {
+          for (let s = 0; s < p.sides; s++) {
+            const angle = p.rotation + (s / p.sides) * Math.PI * 2;
+            const px = p.x + Math.cos(angle) * p.r;
+            const py = p.y + Math.sin(angle) * p.r;
+            s === 0 ? ctx!.moveTo(px, py) : ctx!.lineTo(px, py);
+          }
+          ctx!.closePath();
+        }
+        ctx!.stroke();
+      });
+
+      const SHAPE_SEGMENTS = 48;
+      for (const c of circles) {
+        // Brighten and thicken toward a hovered look as hoverAmount eases
+        // toward 1, rather than snapping instantly — capped well below
+        // full opacity so it reads as a highlight, not a different shape.
+        const drawOpacity = c.opacity + (0.45 - c.opacity) * c.hoverAmount;
+        const drawLineWidth = c.lineWidth + c.hoverAmount * 1.5;
+        ctx!.strokeStyle = `rgba(${SHAPE_COLOR}, ${drawOpacity})`;
+        ctx!.lineWidth = drawLineWidth;
+        ctx!.beginPath();
+
+        if (c.morphing) {
+          // Sampling shapeRadiusAt at fixed angles is the simplest way to
+          // blend two different polygons' radii, but it makes a sharp
+          // vertex wiggle slightly as rotation shifts which sample lands
+          // nearest it — acceptable for a 2s transition, but drawing the
+          // idle (non-morphing) shape from its exact vertices below keeps
+          // corners genuinely crisp and static the other ~80% of the time.
+          const morphT = easeInOutCubic(c.morphTimer / MORPH_FRAMES);
+          for (let i = 0; i <= SHAPE_SEGMENTS; i++) {
+            const theta = (i / SHAPE_SEGMENTS) * Math.PI * 2;
+            const localTheta = theta - c.rotation;
+            const r =
+              shapeRadiusAt(localTheta, c.fromSides, c.r) +
+              (shapeRadiusAt(localTheta, c.toSides, c.r) -
+                shapeRadiusAt(localTheta, c.fromSides, c.r)) *
+                morphT;
+            const px = c.x + Math.cos(theta) * r;
+            const py = c.y + Math.sin(theta) * r;
+            i === 0 ? ctx!.moveTo(px, py) : ctx!.lineTo(px, py);
+          }
+        } else if (c.sides < 3) {
           ctx!.arc(c.x, c.y, c.r, 0, Math.PI * 2);
         } else {
           for (let i = 0; i < c.sides; i++) {
@@ -308,8 +480,8 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
             const py = c.y + Math.sin(angle) * c.r;
             i === 0 ? ctx!.moveTo(px, py) : ctx!.lineTo(px, py);
           }
-          ctx!.closePath();
         }
+        ctx!.closePath();
         ctx!.stroke();
       }
     }
@@ -329,6 +501,20 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     draw();
     if (!reducedMotion) {
       frameId = requestAnimationFrame(loop);
+
+      // Pointer tracking only runs alongside the animation loop — with
+      // reduced motion, the background stays a single static frame and
+      // skips hover feedback too, rather than reacting to the cursor.
+      canvas.style.pointerEvents = "auto";
+      canvas.addEventListener("mousemove", (e) => {
+        const rect = banner!.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+      });
+      canvas.addEventListener("mouseleave", () => {
+        mouseX = null;
+        mouseY = null;
+      });
     }
 
     let resizeTimeout = 0;
