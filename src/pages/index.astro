@@ -68,13 +68,20 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
   title="Abner Soto Multimedia Producer"
   description="Trusted by leading brands to produce, shoot, and edit content that delivers."
 >
-  <section class="hero container">
-    <h1>Abner Soto Multimedia Producer</h1>
-    <p class="hero__tagline">
-      Trusted by leading brands to produce, shoot, and edit content that
-      delivers
-    </p>
-    <a href={withBase("/work")} class="hero__cta">View the work &rarr;</a>
+  <section class="hero-banner">
+    <canvas
+      class="hero-banner__canvas"
+      id="hero-kinetic-bg"
+      aria-hidden="true"
+    ></canvas>
+    <div class="hero container">
+      <h1>Abner Soto Multimedia Producer</h1>
+      <p class="hero__tagline">
+        Trusted by leading brands to produce, shoot, and edit content that
+        delivers
+      </p>
+      <a href={withBase("/work")} class="hero__cta">View the work &rarr;</a>
+    </div>
   </section>
 
   <section class="featured container">
@@ -99,7 +106,22 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
 </BaseLayout>
 
 <style>
+  .hero-banner {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-banner__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+  }
+
   .hero {
+    position: relative;
     padding-block: var(--space-6);
     max-width: 700px;
   }
@@ -130,3 +152,172 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     padding-bottom: var(--space-6);
   }
 </style>
+
+<script>
+  interface Circle {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    r: number;
+  }
+
+  function initHeroKineticBackground() {
+    const canvasRaw = document.getElementById("hero-kinetic-bg");
+    if (!(canvasRaw instanceof HTMLCanvasElement)) return;
+    const canvas: HTMLCanvasElement = canvasRaw;
+    const banner = canvas.closest<HTMLElement>(".hero-banner");
+    const ctx = canvas.getContext("2d");
+    if (!banner || !ctx) return;
+
+    const LINE_DISTANCE = 170;
+    const CIRCLE_COLOR = "rgba(184, 92, 56, 0.35)"; // --color-accent
+    const LINE_COLOR = "184, 92, 56"; // same hue, alpha set per-line below
+
+    let width = 0;
+    let height = 0;
+    let circles: Circle[] = [];
+
+    function seedCircles() {
+      const count = Math.max(6, Math.round((width * height) / 65000));
+      circles = Array.from({ length: count }, () => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        r: 18 + Math.random() * 46,
+      }));
+    }
+
+    function resize() {
+      const rect = banner!.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = width * dpr;
+      canvas.height = height * dpr;
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      seedCircles();
+    }
+
+    // Equal-mass elastic collision: swap the velocity component along the
+    // line connecting the two centers, leave the perpendicular component
+    // untouched — this is what makes the lines between circles feel
+    // "kinetic" rather than just decorative, since their length and
+    // opacity keep shifting as circles actually bounce off each other.
+    function resolveCollision(a: Circle, b: Circle) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy) || 0.0001;
+      const minDist = a.r + b.r;
+      if (dist >= minDist) return;
+
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const overlap = (minDist - dist) / 2;
+      a.x -= nx * overlap;
+      a.y -= ny * overlap;
+      b.x += nx * overlap;
+      b.y += ny * overlap;
+
+      const aN = a.vx * nx + a.vy * ny;
+      const bN = b.vx * nx + b.vy * ny;
+      a.vx += (bN - aN) * nx;
+      a.vy += (bN - aN) * ny;
+      b.vx += (aN - bN) * nx;
+      b.vy += (aN - bN) * ny;
+    }
+
+    function step() {
+      for (const c of circles) {
+        c.x += c.vx;
+        c.y += c.vy;
+        if (c.x - c.r < 0) {
+          c.x = c.r;
+          c.vx = Math.abs(c.vx);
+        } else if (c.x + c.r > width) {
+          c.x = width - c.r;
+          c.vx = -Math.abs(c.vx);
+        }
+        if (c.y - c.r < 0) {
+          c.y = c.r;
+          c.vy = Math.abs(c.vy);
+        } else if (c.y + c.r > height) {
+          c.y = height - c.r;
+          c.vy = -Math.abs(c.vy);
+        }
+      }
+      for (let i = 0; i < circles.length; i++) {
+        for (let j = i + 1; j < circles.length; j++) {
+          resolveCollision(circles[i], circles[j]);
+        }
+      }
+    }
+
+    function draw() {
+      ctx!.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < circles.length; i++) {
+        for (let j = i + 1; j < circles.length; j++) {
+          const a = circles[i];
+          const b = circles[j];
+          const dist = Math.hypot(b.x - a.x, b.y - a.y);
+          if (dist >= LINE_DISTANCE) continue;
+          const alpha = 0.18 * (1 - dist / LINE_DISTANCE);
+          ctx!.strokeStyle = `rgba(${LINE_COLOR}, ${alpha})`;
+          ctx!.lineWidth = 1;
+          ctx!.beginPath();
+          ctx!.moveTo(a.x, a.y);
+          ctx!.lineTo(b.x, b.y);
+          ctx!.stroke();
+        }
+      }
+
+      ctx!.strokeStyle = CIRCLE_COLOR;
+      ctx!.lineWidth = 1.5;
+      for (const c of circles) {
+        ctx!.beginPath();
+        ctx!.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+        ctx!.stroke();
+      }
+    }
+
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    let frameId = 0;
+    function loop() {
+      step();
+      draw();
+      frameId = requestAnimationFrame(loop);
+    }
+
+    resize();
+    draw();
+    if (!reducedMotion) {
+      frameId = requestAnimationFrame(loop);
+    }
+
+    let resizeTimeout = 0;
+    window.addEventListener("resize", () => {
+      window.clearTimeout(resizeTimeout);
+      resizeTimeout = window.setTimeout(() => {
+        resize();
+        draw();
+      }, 150);
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        cancelAnimationFrame(frameId);
+      } else if (!reducedMotion) {
+        frameId = requestAnimationFrame(loop);
+      }
+    });
+  }
+
+  document.readyState === "loading"
+    ? document.addEventListener("DOMContentLoaded", initHeroKineticBackground)
+    : initHeroKineticBackground();
+</script>
