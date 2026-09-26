@@ -136,6 +136,10 @@
     overflow-x: auto;
     max-width: 90vw;
     padding-block: var(--space-1);
+    /* Matches the active thumbnail's outline width below — without it,
+       that outline gets clipped by this container's own scroll edge on
+       whichever thumbnail sits first or last. */
+    padding-inline: 2px;
   }
 
   /* :global() because these <img> elements are created by the script
