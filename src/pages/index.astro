@@ -241,6 +241,21 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     let mouseX: number | null = null;
     let mouseY: number | null = null;
 
+    // Ghost trail: recent positions/forms of whichever shape is currently
+    // hovered, oldest first, rendered faintest to most recent. Decays by
+    // dropping its oldest entry each frame once nothing is hovered, so it
+    // shortens away rather than vanishing abruptly.
+    interface TrailPoint {
+      x: number;
+      y: number;
+      r: number;
+      sides: number;
+      rotation: number;
+    }
+    const TRAIL_MAX_LENGTH = 16;
+    let trail: TrailPoint[] = [];
+    let trailOwner: Circle | null = null;
+
     function seedCircles() {
       const count = Math.max(6, Math.round((width * height) / 65000));
       circles = Array.from({ length: count }, () => {
@@ -316,6 +331,7 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     }
 
     function step() {
+      let currentHoveredCircle: Circle | null = null;
       for (const c of circles) {
         c.x += c.vx;
         c.y += c.vy;
@@ -325,6 +341,7 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
           mouseX !== null &&
           mouseY !== null &&
           Math.hypot(c.x - mouseX, c.y - mouseY) < c.r;
+        if (hovered) currentHoveredCircle = c;
         c.hoverAmount += ((hovered ? 1 : 0) - c.hoverAmount) * 0.15;
 
         c.morphTimer++;
@@ -362,6 +379,24 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
           resolveCollision(circles[i], circles[j]);
         }
       }
+
+      if (currentHoveredCircle) {
+        if (trailOwner !== currentHoveredCircle) {
+          trail = [];
+          trailOwner = currentHoveredCircle;
+        }
+        trail.push({
+          x: currentHoveredCircle.x,
+          y: currentHoveredCircle.y,
+          r: currentHoveredCircle.r,
+          sides: currentHoveredCircle.sides,
+          rotation: currentHoveredCircle.rotation,
+        });
+        if (trail.length > TRAIL_MAX_LENGTH) trail.shift();
+      } else if (trail.length > 0) {
+        trail.shift();
+        if (trail.length === 0) trailOwner = null;
+      }
     }
 
     function draw() {
@@ -382,6 +417,28 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
           ctx!.stroke();
         }
       }
+
+      // Ghost trail for the hovered shape: oldest entries faintest, drawn
+      // before the live shapes so the real, brightest copy ends up on top.
+      const TRAIL_MAX_ALPHA = 0.14;
+      trail.forEach((p, i) => {
+        const alpha = TRAIL_MAX_ALPHA * ((i + 1) / trail.length);
+        ctx!.strokeStyle = `rgba(${SHAPE_COLOR}, ${alpha})`;
+        ctx!.lineWidth = 1;
+        ctx!.beginPath();
+        if (p.sides < 3) {
+          ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        } else {
+          for (let s = 0; s < p.sides; s++) {
+            const angle = p.rotation + (s / p.sides) * Math.PI * 2;
+            const px = p.x + Math.cos(angle) * p.r;
+            const py = p.y + Math.sin(angle) * p.r;
+            s === 0 ? ctx!.moveTo(px, py) : ctx!.lineTo(px, py);
+          }
+          ctx!.closePath();
+        }
+        ctx!.stroke();
+      });
 
       const SHAPE_SEGMENTS = 48;
       for (const c of circles) {
