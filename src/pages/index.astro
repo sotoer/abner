@@ -192,7 +192,7 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
         // reads as a technical schematic rather than uniform, cartoonish
         // bubbles — mimics different "layers" of emphasis on a diagram.
         lineWidth: 0.5 + Math.random() * 2,
-        opacity: 0.08 + Math.random() * 0.3,
+        opacity: 0.05 + Math.random() * 0.12, // max stays below the 0.175 flat value set earlier
       }));
     }
 
