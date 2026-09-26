@@ -24,7 +24,6 @@
           allowfullscreen
         ></iframe>
       </div>
-      <figcaption class="lightbox__caption" id="lightbox-caption"></figcaption>
     </figure>
     <button type="button" class="lightbox__next" data-lightbox-next aria-label="Next image">
       &#x203A;
@@ -90,14 +89,6 @@
     width: 100%;
     height: 100%;
     border: 0;
-  }
-
-  .lightbox__caption {
-    color: #fff;
-    font-size: 0.85rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    opacity: 0.8;
   }
 
   .lightbox__close,
@@ -172,14 +163,12 @@
     const imageRaw = document.getElementById("lightbox-image");
     const videoWrapRaw = document.getElementById("lightbox-video-wrap");
     const videoRaw = document.getElementById("lightbox-video");
-    const captionRaw = document.getElementById("lightbox-caption");
     const filmstripRaw = document.getElementById("lightbox-filmstrip");
     if (
       !(rootRaw instanceof HTMLElement) ||
       !(imageRaw instanceof HTMLImageElement) ||
       !(videoWrapRaw instanceof HTMLElement) ||
       !(videoRaw instanceof HTMLIFrameElement) ||
-      !(captionRaw instanceof HTMLElement) ||
       !(filmstripRaw instanceof HTMLElement)
     ) {
       return;
@@ -192,7 +181,6 @@
     const imageEl: HTMLImageElement = imageRaw;
     const videoWrapEl: HTMLElement = videoWrapRaw;
     const videoEl: HTMLIFrameElement = videoRaw;
-    const captionEl: HTMLElement = captionRaw;
     const filmstripEl: HTMLElement = filmstripRaw;
 
     const triggers = Array.from(
@@ -271,7 +259,6 @@
     function show(index: number) {
       currentIndex = (index + activeSlides.length) % activeSlides.length;
       const slide = activeSlides[currentIndex];
-      captionEl.textContent = slide.caption;
 
       if (slide.kind === "video") {
         imageEl.hidden = true;
