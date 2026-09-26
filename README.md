@@ -28,6 +28,9 @@ npm run preview       # preview the production build locally
 npx astro check       # type-check .astro files and the content schema
 ```
 
+Copy `.env.example` to `.env` to turn on optional features (currently: the
+contact form's reCAPTCHA widget). Everything works without it.
+
 ## Project structure
 
 ```
