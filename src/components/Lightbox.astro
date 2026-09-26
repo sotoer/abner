@@ -138,17 +138,27 @@
     padding-block: var(--space-1);
   }
 
-  .lightbox__filmstrip img {
+  /* :global() because these <img> elements are created by the script
+     below (renderFilmstrip) rather than authored in this file's
+     template, so they never carry the data-astro-cid attribute Astro's
+     scoped styles rely on — a plain scoped selector here would silently
+     never match. */
+  .lightbox__filmstrip :global(img) {
     height: 60px;
     width: auto;
     opacity: 0.5;
     cursor: pointer;
     border-radius: 2px;
+    transition: opacity 0.15s ease;
   }
 
-  .lightbox__filmstrip img.is-active {
+  .lightbox__filmstrip :global(img.is-active) {
     opacity: 1;
     outline: 2px solid var(--color-accent);
+  }
+
+  .lightbox__filmstrip :global(img.is-active:hover) {
+    opacity: 0.85;
   }
 </style>
 
