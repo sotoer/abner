@@ -18,17 +18,20 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
       discuss how we might collaborate.
     </p>
 
-    <!-- TODO: wire this form to Netlify Forms or Formspree once a backend is chosen.
-         Whichever it is: have it reject a submission where the honeypot field
-         below is non-empty, and — once PUBLIC_RECAPTCHA_SITE_KEY is set — verify
-         the g-recaptcha-response token server-side with the matching SECRET key
-         via https://www.google.com/recaptcha/api/siteverify. Both JS guards here
-         only stop bots that execute page scripts; one posting straight to the
-         endpoint skips them entirely, so the real checks have to happen
-         server-side. -->
+    <!-- Submits to Formspree (https://formspree.io) via fetch (see the
+         script below) rather than a plain form POST, so we can show an
+         inline success/error message instead of navigating to Formspree's
+         own confirmation page. Formspree recognizes a field literally
+         named `_gotcha` as a honeypot and silently discards (200s without
+         emailing) any submission where it's non-empty — see the label
+         below — so that check now applies even to a bot that skips our
+         page JS and posts straight to the endpoint. The reCAPTCHA token
+         isn't independently verified by Formspree (their built-in
+         reCAPTCHA support targets v2), so it's a client-side deterrent
+         only for now. -->
     <form
       class="contact__form"
-      action="#"
+      action="https://formspree.io/f/xnpnbrgd"
       method="post"
       data-recaptcha-site-key={recaptchaSiteKey}
     >
@@ -48,10 +51,11 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
            readers (aria-hidden + removed from tab order), but present in
            the raw HTML for simple bots that fill in every field to find
            and fill. A human never sees or reaches it, so any submission
-           with this non-empty is spam. -->
+           with this non-empty is spam. Named `_gotcha` so Formspree
+           itself enforces this, not just our page JS. -->
       <label class="contact__hp" aria-hidden="true">
         Company
-        <input type="text" name="company" tabindex="-1" autocomplete="off" />
+        <input type="text" name="_gotcha" tabindex="-1" autocomplete="off" />
       </label>
       {
         recaptchaSiteKey && (
@@ -59,6 +63,7 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
         )
       }
       <button type="submit">Send</button>
+      <p class="contact__status" role="status" aria-live="polite" hidden></p>
     </form>
   </section>
 
@@ -146,6 +151,15 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
     height: 1px;
     overflow: hidden;
   }
+
+  .contact__status {
+    margin: 0;
+    font-size: 0.85rem;
+  }
+
+  .contact__status[data-state="error"] {
+    color: var(--color-accent);
+  }
 </style>
 
 <script>
@@ -157,37 +171,64 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
     | undefined;
 
   const form = document.querySelector<HTMLFormElement>(".contact__form");
-  const honeypot = form?.querySelector<HTMLInputElement>('[name="company"]');
+  const honeypot = form?.querySelector<HTMLInputElement>('[name="_gotcha"]');
   const siteKey = form?.dataset.recaptchaSiteKey;
   const tokenField =
     form?.querySelector<HTMLInputElement>('[name="g-recaptcha-response"]');
+  const submitButton = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
+  const statusEl = form?.querySelector<HTMLElement>(".contact__status");
 
-  // v3 is invisible — no checkbox to complete, just a token fetched right
-  // before submit — so once it's attached this flag lets the resubmit
-  // through instead of re-fetching a token forever.
-  let hasToken = false;
-
-  form?.addEventListener("submit", (e) => {
-    // A human never sees or fills this field, so a non-empty value means
-    // a bot filled in every input it could find — silently drop the
-    // submission. Only stops bots that execute page JS; the form's
-    // eventual backend still needs to reject this server-side too (see
-    // the TODO above).
-    if (honeypot?.value) {
-      e.preventDefault();
+  function setStatus(state: "sending" | "success" | "error" | null) {
+    if (!statusEl) return;
+    if (submitButton) submitButton.disabled = state === "sending";
+    if (!state) {
+      statusEl.hidden = true;
       return;
     }
+    statusEl.hidden = false;
+    statusEl.dataset.state = state;
+    statusEl.textContent =
+      state === "sending"
+        ? "Sending…"
+        : state === "success"
+          ? "Thanks — I'll be in touch soon."
+          : "Something went wrong sending that. Please try again, or email me directly.";
+  }
 
-    if (!siteKey || hasToken) return;
+  async function send() {
+    if (!form) return;
+    setStatus("sending");
+    try {
+      const res = await fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { Accept: "application/json" },
+      });
+      if (res.ok) {
+        setStatus("success");
+        form.reset();
+      } else {
+        setStatus("error");
+      }
+    } catch {
+      setStatus("error");
+    }
+  }
 
+  form?.addEventListener("submit", (e) => {
     e.preventDefault();
 
-    // If Google's script hasn't loaded (e.g. blocked in the visitor's
-    // region), grecaptcha is undefined — let the submission through
-    // rather than locking out a real visitor over a third-party script
-    // failing to load; the honeypot and server-side checks still apply.
-    if (typeof grecaptcha === "undefined") {
-      form?.submit();
+    // A human never sees or fills this field, so a non-empty value means a
+    // bot filled in every input it could find. Formspree also enforces
+    // this server-side (the field is named `_gotcha`), but skip the
+    // network request entirely for a bot that runs our page JS too.
+    if (honeypot?.value) return;
+
+    if (!siteKey || typeof grecaptcha === "undefined") {
+      // No widget configured, or Google's script failed to load (e.g.
+      // blocked in the visitor's region) — send without a token rather
+      // than locking out a real visitor over it.
+      void send();
       return;
     }
 
@@ -196,13 +237,12 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
         .execute(siteKey, { action: "contact" })
         .then((token) => {
           if (tokenField) tokenField.value = token;
-          hasToken = true;
-          form?.requestSubmit();
+          void send();
         })
         .catch(() => {
-          // Same reasoning as the script-blocked case above: don't lock a
-          // real visitor out over a failed background token fetch.
-          form?.submit();
+          // Same reasoning as above: don't block a real submission over a
+          // failed background token fetch.
+          void send();
         });
     });
   });
