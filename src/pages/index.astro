@@ -160,6 +160,8 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     vx: number;
     vy: number;
     r: number;
+    lineWidth: number;
+    opacity: number;
   }
 
   function initHeroKineticBackground() {
@@ -171,7 +173,7 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     if (!banner || !ctx) return;
 
     const LINE_DISTANCE = 170;
-    const CIRCLE_COLOR = "rgba(184, 92, 56, 0.175)"; // --color-accent
+    const CIRCLE_COLOR = "184, 92, 56"; // --color-accent, alpha set per-circle below
     const LINE_COLOR = "184, 92, 56"; // same hue, alpha set per-line below
 
     let width = 0;
@@ -186,6 +188,11 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
         vx: (Math.random() - 0.5) * 0.5,
         vy: (Math.random() - 0.5) * 0.5,
         r: 18 + Math.random() * 46,
+        // Varying these per circle (hairline/faint vs. bold/solid) is what
+        // reads as a technical schematic rather than uniform, cartoonish
+        // bubbles — mimics different "layers" of emphasis on a diagram.
+        lineWidth: 0.5 + Math.random() * 2,
+        opacity: 0.08 + Math.random() * 0.3,
       }));
     }
 
@@ -273,9 +280,9 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
         }
       }
 
-      ctx!.strokeStyle = CIRCLE_COLOR;
-      ctx!.lineWidth = 1.5;
       for (const c of circles) {
+        ctx!.strokeStyle = `rgba(${CIRCLE_COLOR}, ${c.opacity})`;
+        ctx!.lineWidth = c.lineWidth;
         ctx!.beginPath();
         ctx!.arc(c.x, c.y, c.r, 0, Math.PI * 2);
         ctx!.stroke();
