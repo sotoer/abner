@@ -178,6 +178,9 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     toSides: number;
     morphTimer: number;
     idleFrames: number;
+    // Eased 0-1 toward 1 while the cursor is over this shape, toward 0
+    // otherwise — drives a brightened, bolder highlight in draw().
+    hoverAmount: number;
   }
 
   function initHeroKineticBackground() {
@@ -235,6 +238,8 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     let width = 0;
     let height = 0;
     let circles: Circle[] = [];
+    let mouseX: number | null = null;
+    let mouseY: number | null = null;
 
     function seedCircles() {
       const count = Math.max(6, Math.round((width * height) / 65000));
@@ -266,6 +271,7 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
           // start their morph cycles in sync.
           morphTimer: Math.random() * idleFrames,
           idleFrames,
+          hoverAmount: 0,
         };
       });
     }
@@ -314,6 +320,12 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
         c.x += c.vx;
         c.y += c.vy;
         c.rotation += c.rotationSpeed;
+
+        const hovered =
+          mouseX !== null &&
+          mouseY !== null &&
+          Math.hypot(c.x - mouseX, c.y - mouseY) < c.r;
+        c.hoverAmount += ((hovered ? 1 : 0) - c.hoverAmount) * 0.15;
 
         c.morphTimer++;
         if (!c.morphing) {
@@ -373,8 +385,13 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
 
       const SHAPE_SEGMENTS = 48;
       for (const c of circles) {
-        ctx!.strokeStyle = `rgba(${SHAPE_COLOR}, ${c.opacity})`;
-        ctx!.lineWidth = c.lineWidth;
+        // Brighten and thicken toward a hovered look as hoverAmount eases
+        // toward 1, rather than snapping instantly — capped well below
+        // full opacity so it reads as a highlight, not a different shape.
+        const drawOpacity = c.opacity + (0.45 - c.opacity) * c.hoverAmount;
+        const drawLineWidth = c.lineWidth + c.hoverAmount * 1.5;
+        ctx!.strokeStyle = `rgba(${SHAPE_COLOR}, ${drawOpacity})`;
+        ctx!.lineWidth = drawLineWidth;
         ctx!.beginPath();
 
         if (c.morphing) {
@@ -427,6 +444,20 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     draw();
     if (!reducedMotion) {
       frameId = requestAnimationFrame(loop);
+
+      // Pointer tracking only runs alongside the animation loop — with
+      // reduced motion, the background stays a single static frame and
+      // skips hover feedback too, rather than reacting to the cursor.
+      canvas.style.pointerEvents = "auto";
+      canvas.addEventListener("mousemove", (e) => {
+        const rect = banner!.getBoundingClientRect();
+        mouseX = e.clientX - rect.left;
+        mouseY = e.clientY - rect.top;
+      });
+      canvas.addEventListener("mouseleave", () => {
+        mouseX = null;
+        mouseY = null;
+      });
     }
 
     let resizeTimeout = 0;
