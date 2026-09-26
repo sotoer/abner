@@ -377,26 +377,35 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
         ctx!.lineWidth = c.lineWidth;
         ctx!.beginPath();
 
-        // Both a plain circle (sides < 3) and a low-sided polygon are
-        // sampled at the same number of points along their true boundary
-        // (via shapeRadiusAt), so a polygon's edges still come out as
-        // straight lines — this just lets a mid-morph shape interpolate
-        // the radius at each sampled angle between its from/to shapes.
-        const morphT = c.morphing
-          ? easeInOutCubic(c.morphTimer / MORPH_FRAMES)
-          : 0;
-        for (let i = 0; i <= SHAPE_SEGMENTS; i++) {
-          const theta = (i / SHAPE_SEGMENTS) * Math.PI * 2;
-          const localTheta = theta - c.rotation;
-          const r = c.morphing
-            ? shapeRadiusAt(localTheta, c.fromSides, c.r) +
+        if (c.morphing) {
+          // Sampling shapeRadiusAt at fixed angles is the simplest way to
+          // blend two different polygons' radii, but it makes a sharp
+          // vertex wiggle slightly as rotation shifts which sample lands
+          // nearest it — acceptable for a 2s transition, but drawing the
+          // idle (non-morphing) shape from its exact vertices below keeps
+          // corners genuinely crisp and static the other ~80% of the time.
+          const morphT = easeInOutCubic(c.morphTimer / MORPH_FRAMES);
+          for (let i = 0; i <= SHAPE_SEGMENTS; i++) {
+            const theta = (i / SHAPE_SEGMENTS) * Math.PI * 2;
+            const localTheta = theta - c.rotation;
+            const r =
+              shapeRadiusAt(localTheta, c.fromSides, c.r) +
               (shapeRadiusAt(localTheta, c.toSides, c.r) -
                 shapeRadiusAt(localTheta, c.fromSides, c.r)) *
-                morphT
-            : shapeRadiusAt(localTheta, c.sides, c.r);
-          const px = c.x + Math.cos(theta) * r;
-          const py = c.y + Math.sin(theta) * r;
-          i === 0 ? ctx!.moveTo(px, py) : ctx!.lineTo(px, py);
+                morphT;
+            const px = c.x + Math.cos(theta) * r;
+            const py = c.y + Math.sin(theta) * r;
+            i === 0 ? ctx!.moveTo(px, py) : ctx!.lineTo(px, py);
+          }
+        } else if (c.sides < 3) {
+          ctx!.arc(c.x, c.y, c.r, 0, Math.PI * 2);
+        } else {
+          for (let i = 0; i < c.sides; i++) {
+            const angle = c.rotation + (i / c.sides) * Math.PI * 2;
+            const px = c.x + Math.cos(angle) * c.r;
+            const py = c.y + Math.sin(angle) * c.r;
+            i === 0 ? ctx!.moveTo(px, py) : ctx!.lineTo(px, py);
+          }
         }
         ctx!.closePath();
         ctx!.stroke();
