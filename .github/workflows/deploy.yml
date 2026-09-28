@@ -40,6 +40,10 @@ jobs:
           # in a fork's build, the contact form's reCAPTCHA widget just
           # doesn't render — see src/pages/contact.astro.
           PUBLIC_RECAPTCHA_SITE_KEY: ${{ vars.PUBLIC_RECAPTCHA_SITE_KEY }}
+          # Same reasoning: a GA4 Measurement ID is meant to be public.
+          # Unset in a fork's build, no analytics script loads at all —
+          # see src/layouts/BaseLayout.astro.
+          PUBLIC_GA_MEASUREMENT_ID: ${{ vars.PUBLIC_GA_MEASUREMENT_ID }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
