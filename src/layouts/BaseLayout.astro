@@ -11,6 +11,11 @@ interface Props {
 }
 
 const { title, description } = Astro.props;
+
+// Set PUBLIC_GA_MEASUREMENT_ID (see .env.example) to turn on Google
+// Analytics. Left unset, no analytics script loads at all — no blocked
+// request, no console noise, nothing sent anywhere.
+const gaMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID;
 ---
 
 <html lang="en">
@@ -25,6 +30,25 @@ const { title, description } = Astro.props;
       rel="stylesheet"
     />
     <Seo title={title} description={description} />
+    {
+      gaMeasurementId && (
+        <Fragment>
+          <script
+            is:inline
+            async
+            src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
+          />
+          <script is:inline define:vars={{ gaMeasurementId }}>
+            window.dataLayer = window.dataLayer || [];
+            function gtag() {
+              dataLayer.push(arguments);
+            }
+            gtag("js", new Date());
+            gtag("config", gaMeasurementId);
+          </script>
+        </Fragment>
+      )
+    }
   </head>
   <body>
     <Nav />
