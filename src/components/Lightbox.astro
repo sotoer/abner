@@ -133,6 +133,15 @@
     padding-inline: 2px;
   }
 
+  /* Flex items shrink to fit their container by default, which was
+     squeezing every thumbnail narrower on small viewports instead of
+     letting the strip overflow and scroll. flex-shrink: 0 keeps each
+     <li> at its natural (image) size so overflow-x: auto above actually
+     kicks in. */
+  .lightbox__filmstrip :global(li) {
+    flex: 0 0 auto;
+  }
+
   /* :global() because these <img> elements are created by the script
      below (renderFilmstrip) rather than authored in this file's
      template, so they never carry the data-astro-cid attribute Astro's
@@ -242,8 +251,35 @@
     let currentIndex = 0;
     let lastFocused: HTMLElement | null = null;
 
+    function whenImageReady(img: HTMLImageElement): Promise<void> {
+      if (img.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.addEventListener("load", () => resolve(), { once: true });
+        img.addEventListener("error", () => resolve(), { once: true });
+      });
+    }
+
+    function centerActiveThumbnail(li: HTMLLIElement) {
+      // Computed manually rather than via scrollIntoView({inline:
+      // "center"}), which measurably undershoots the true center in
+      // testing (off by ~50px in a 326px-wide strip) — likely a browser
+      // quirk combining inline and block alignment on a flex container.
+      // This directly converts the thumbnail's current viewport position
+      // back to a content-relative one (adding back the existing scroll
+      // offset) to get an exact target.
+      const containerRect = filmstripEl.getBoundingClientRect();
+      const liRect = li.getBoundingClientRect();
+      const liCenterInContent =
+        liRect.left - containerRect.left + filmstripEl.scrollLeft + liRect.width / 2;
+      const target = liCenterInContent - containerRect.width / 2;
+      const maxScroll = filmstripEl.scrollWidth - filmstripEl.clientWidth;
+      filmstripEl.scrollLeft = Math.max(0, Math.min(target, maxScroll));
+    }
+
     function renderFilmstrip() {
       filmstripEl.innerHTML = "";
+      let activeLi: HTMLLIElement | null = null;
+      const imgs: HTMLImageElement[] = [];
       activeSlides.forEach((slide, i) => {
         const li = document.createElement("li");
         const img = document.createElement("img");
@@ -253,6 +289,19 @@
         li.appendChild(img);
         li.addEventListener("click", () => show(i));
         filmstripEl.appendChild(li);
+        imgs.push(img);
+        if (i === currentIndex) activeLi = li;
+      });
+      // scrollWidth doesn't reflect each thumbnail's true rendered width
+      // until its image has actually loaded/decoded — centering right
+      // away (even a frame later) can compute against a too-small,
+      // pre-overflow layout and land at scrollLeft 0. Wait for every
+      // thumbnail to finish loading first, then one more frame for that
+      // layout to settle before measuring.
+      Promise.all(imgs.map(whenImageReady)).then(() => {
+        requestAnimationFrame(() => {
+          if (activeLi) centerActiveThumbnail(activeLi);
+        });
       });
     }
 
