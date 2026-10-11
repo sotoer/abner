@@ -1,4 +1,5 @@
 ---
+import { ClientRouter } from "astro:transitions";
 import Nav from "../components/Nav.astro";
 import Footer from "../components/Footer.astro";
 import Seo from "../components/Seo.astro";
@@ -30,6 +31,7 @@ const gaMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID;
       rel="stylesheet"
     />
     <Seo title={title} description={description} />
+    <ClientRouter />
     {
       gaMeasurementId && (
         <Fragment>
@@ -45,6 +47,29 @@ const gaMeasurementId = import.meta.env.PUBLIC_GA_MEASUREMENT_ID;
             }
             gtag("js", new Date());
             gtag("config", gaMeasurementId);
+          </script>
+          <script is:inline>
+            // With view transitions, navigating between pages doesn't
+            // reload the document, so gtag's automatic pageview (sent by
+            // the "config" call above, once) is the only one that would
+            // ever fire — every page after the first would go untracked.
+            // astro:page-load fires on that first load too, so skip
+            // sending a duplicate for it and only report subsequent
+            // transitions.
+            let gaSentInitialPageview = false;
+            document.addEventListener("astro:page-load", () => {
+              if (!gaSentInitialPageview) {
+                gaSentInitialPageview = true;
+                return;
+              }
+              if (typeof gtag === "function") {
+                gtag("event", "page_view", {
+                  page_location: location.href,
+                  page_path: location.pathname,
+                  page_title: document.title,
+                });
+              }
+            });
           </script>
         </Fragment>
       )

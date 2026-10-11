@@ -187,7 +187,18 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     bounces: boolean;
   }
 
+  // With view transitions, this script's module only ever loads once per
+  // browser session — astro:page-load (not DOMContentLoaded) is what
+  // re-runs initHeroKineticBackground on every subsequent navigation back
+  // to this page, and astro:before-swap runs this cleanup beforehand so
+  // the previous instance's rAF loop and global listeners don't keep
+  // running in the background against a now-removed canvas.
+  let cleanupKinetic: (() => void) | null = null;
+
   function initHeroKineticBackground() {
+    cleanupKinetic?.();
+    cleanupKinetic = null;
+
     const canvasRaw = document.getElementById("hero-kinetic-bg");
     if (!(canvasRaw instanceof HTMLCanvasElement)) return;
     const canvas: HTMLCanvasElement = canvasRaw;
@@ -582,24 +593,35 @@ const tileSeeds = Array.from({ length: TILE_COUNT }, (_, i) => {
     }
 
     let resizeTimeout = 0;
-    window.addEventListener("resize", () => {
+    const onResize = () => {
       window.clearTimeout(resizeTimeout);
       resizeTimeout = window.setTimeout(() => {
         resize();
         draw();
       }, 150);
-    });
+    };
+    window.addEventListener("resize", onResize);
 
-    document.addEventListener("visibilitychange", () => {
+    const onVisibilityChange = () => {
       if (document.hidden) {
         cancelAnimationFrame(frameId);
       } else if (!reducedMotion) {
         frameId = requestAnimationFrame(loop);
       }
-    });
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    cleanupKinetic = () => {
+      cancelAnimationFrame(frameId);
+      window.clearTimeout(resizeTimeout);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }
 
-  document.readyState === "loading"
-    ? document.addEventListener("DOMContentLoaded", initHeroKineticBackground)
-    : initHeroKineticBackground();
+  document.addEventListener("astro:page-load", initHeroKineticBackground);
+  document.addEventListener("astro:before-swap", () => {
+    cleanupKinetic?.();
+    cleanupKinetic = null;
+  });
 </script>

@@ -144,22 +144,22 @@ const {
     current: Thumb | null;
   }
 
-  function initMosaicCycling() {
+  function initMosaicCycling(): (() => void) | null {
     const container = document.querySelector<HTMLElement>(
       ".masonry[data-mosaic-pool]",
     );
-    if (!container) return;
+    if (!container) return null;
 
     let pool: Thumb[];
     let slidesByCategory: Record<string, Slide[]>;
     try {
       const parsedPool = JSON.parse(container.dataset.mosaicPool || "[]");
       const parsedSlides = JSON.parse(container.dataset.mosaicSlides || "{}");
-      if (!Array.isArray(parsedPool) || parsedPool.length === 0) return;
+      if (!Array.isArray(parsedPool) || parsedPool.length === 0) return null;
       pool = parsedPool;
       slidesByCategory = parsedSlides;
     } catch {
-      return;
+      return null;
     }
 
     const states = Array.from(
@@ -175,7 +175,7 @@ const {
         return { el: tile, layers, active, current: null };
       })
       .filter((state): state is TileState => state !== null);
-    if (states.length === 0) return;
+    if (states.length === 0) return null;
 
     let queue = shuffle(pool);
 
@@ -252,13 +252,15 @@ const {
     const tickMs = MIN_DISPLAY_MS / states.length;
     let order = shuffle(states.map((_, i) => i));
     let pos = 0;
-    setInterval(() => {
+    const intervalId = setInterval(() => {
       if (pos >= order.length) {
         order = shuffle(order);
         pos = 0;
       }
       advance(order[pos++], false);
     }, tickMs);
+
+    return () => clearInterval(intervalId);
   }
 
   // Measures a spacing token in pixels via a throwaway probe element,
@@ -286,13 +288,13 @@ const {
   // in a photo of a different shape — animates smoothly, and shuffles
   // every other tile's position to match rather than just growing in
   // place.
-  function initMasonryLayout() {
+  function initMasonryLayout(): (() => void) | null {
     const containers = new Set<HTMLElement>();
     document.querySelectorAll<HTMLElement>(".category-mosaic-card").forEach((tile) => {
       const container = tile.closest<HTMLElement>(".masonry");
       if (container) containers.add(container);
     });
-    if (containers.size === 0) return;
+    if (containers.size === 0) return null;
 
     const gapPx = measureSpaceToken("--space-2");
 
@@ -331,24 +333,40 @@ const {
     layoutAll();
 
     let resizeTimer: ReturnType<typeof setTimeout> | undefined;
-    window.addEventListener("resize", () => {
+    const onResize = () => {
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(layoutAll, 150);
-    });
+    };
+    window.addEventListener("resize", onResize);
 
     containers.forEach((container) => {
       container.addEventListener("mosaic:aspect-change", () => layout(container));
     });
+
+    return () => {
+      clearTimeout(resizeTimer);
+      window.removeEventListener("resize", onResize);
+    };
   }
+
+  // With view transitions, this script's module only ever loads once per
+  // browser session — astro:page-load (not DOMContentLoaded) is what
+  // re-runs init on every subsequent navigation back to this page, and
+  // astro:before-swap runs the returned cleanup functions beforehand so
+  // the cycling interval and resize listener from a previous visit don't
+  // keep running in the background after the tiles are gone.
+  let cleanupFns: Array<() => void> = [];
 
   function init() {
-    initMosaicCycling();
-    initMasonryLayout();
+    cleanupFns.forEach((fn) => fn());
+    cleanupFns = [initMosaicCycling(), initMasonryLayout()].filter(
+      (fn): fn is () => void => fn !== null,
+    );
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  document.addEventListener("astro:page-load", init);
+  document.addEventListener("astro:before-swap", () => {
+    cleanupFns.forEach((fn) => fn());
+    cleanupFns = [];
+  });
 </script>
