@@ -1,4 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="4" fill="#1a1a1a" />
-  <text x="16" y="22" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#b85c38">A</text>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 100 100">
+  <!-- Generator: Adobe Illustrator 30.8.2, SVG Export Plug-In . SVG Version: 2.1.4 Build 7)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: #006837;
+      }
+    </style>
+  </defs>
+  <path class="st0" d="M36.8,68.09l8.4-11.52h9c1.92,0,4.2,0,5.46.12-.6-.66-1.92-2.52-2.76-3.78l-6.72-9.78-17.94,24.96H15.8l25.68-35.76c1.92-2.7,4.62-5.1,8.94-5.1s6.9,2.22,8.88,5.1l24.96,35.76h-47.46Z"/>
 </svg>
