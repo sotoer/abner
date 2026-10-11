@@ -13,7 +13,7 @@
     <button type="button" class="lightbox__prev" data-lightbox-prev aria-label="Previous image">
       &#x2039;
     </button>
-    <figure class="lightbox__figure">
+    <figure class="lightbox__figure" id="lightbox-figure">
       <img class="lightbox__image" id="lightbox-image" alt="" />
       <div class="lightbox__video-wrap" id="lightbox-video-wrap" hidden>
         <iframe
@@ -173,12 +173,14 @@
     const videoWrapRaw = document.getElementById("lightbox-video-wrap");
     const videoRaw = document.getElementById("lightbox-video");
     const filmstripRaw = document.getElementById("lightbox-filmstrip");
+    const figureRaw = document.getElementById("lightbox-figure");
     if (
       !(rootRaw instanceof HTMLElement) ||
       !(imageRaw instanceof HTMLImageElement) ||
       !(videoWrapRaw instanceof HTMLElement) ||
       !(videoRaw instanceof HTMLIFrameElement) ||
-      !(filmstripRaw instanceof HTMLElement)
+      !(filmstripRaw instanceof HTMLElement) ||
+      !(figureRaw instanceof HTMLElement)
     ) {
       return;
     }
@@ -191,6 +193,7 @@
     const videoWrapEl: HTMLElement = videoWrapRaw;
     const videoEl: HTMLIFrameElement = videoRaw;
     const filmstripEl: HTMLElement = filmstripRaw;
+    const figureEl: HTMLElement = figureRaw;
 
     const triggers = Array.from(
       document.querySelectorAll<HTMLElement>("[data-lightbox-trigger]"),
@@ -377,6 +380,37 @@
     root
       .querySelector("[data-lightbox-next]")
       ?.addEventListener("click", () => show(currentIndex + 1));
+
+    // Swipe to navigate on touch devices. Scoped to the figure (the main
+    // image/video area) rather than the whole dialog, so it doesn't
+    // interfere with the filmstrip's own horizontal touch-scrolling.
+    const SWIPE_THRESHOLD = 50;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    figureEl.addEventListener(
+      "touchstart",
+      (e) => {
+        if (e.touches.length !== 1) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      },
+      { passive: true },
+    );
+    figureEl.addEventListener(
+      "touchend",
+      (e) => {
+        const touch = e.changedTouches[0];
+        if (!touch) return;
+        const dx = touch.clientX - touchStartX;
+        const dy = touch.clientY - touchStartY;
+        // Require the swipe to be clearly horizontal (not a vertical
+        // scroll/pinch gesture) and past a minimum distance.
+        if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          show(currentIndex + (dx < 0 ? 1 : -1));
+        }
+      },
+      { passive: true },
+    );
 
     document.addEventListener("keydown", (e) => {
       if (root.hidden) return;
