@@ -167,7 +167,18 @@
 </style>
 
 <script>
+  // With view transitions, this script's module only ever loads once per
+  // browser session — astro:page-load (not DOMContentLoaded) is what
+  // re-runs initLightbox on every subsequent navigation, and
+  // astro:before-swap runs this cleanup beforehand so a previous page's
+  // document-level keydown listener doesn't keep firing (and duplicate
+  // once per revisit) alongside the new page's.
+  let cleanupLightbox: (() => void) | null = null;
+
   function initLightbox() {
+    cleanupLightbox?.();
+    cleanupLightbox = null;
+
     const rootRaw = document.getElementById("lightbox");
     const imageRaw = document.getElementById("lightbox-image");
     const videoWrapRaw = document.getElementById("lightbox-video-wrap");
@@ -412,17 +423,22 @@
       { passive: true },
     );
 
-    document.addEventListener("keydown", (e) => {
+    const onKeydown = (e: KeyboardEvent) => {
       if (root.hidden) return;
       if (e.key === "Escape") close();
       if (e.key === "ArrowLeft") show(currentIndex - 1);
       if (e.key === "ArrowRight") show(currentIndex + 1);
-    });
+    };
+    document.addEventListener("keydown", onKeydown);
+
+    cleanupLightbox = () => {
+      document.removeEventListener("keydown", onKeydown);
+    };
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initLightbox);
-  } else {
-    initLightbox();
-  }
+  document.addEventListener("astro:page-load", initLightbox);
+  document.addEventListener("astro:before-swap", () => {
+    cleanupLightbox?.();
+    cleanupLightbox = null;
+  });
 </script>
