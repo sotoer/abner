@@ -10,6 +10,7 @@
 interface Props {
   thumbSrc: string;
   thumbAlt: string;
+  thumbKind: "photo" | "video";
   width: number;
   height: number;
   categoryLabel: string;
@@ -27,6 +28,7 @@ interface Props {
 const {
   thumbSrc,
   thumbAlt,
+  thumbKind,
   width,
   height,
   categoryLabel,
@@ -48,6 +50,13 @@ const {
 >
   <img class="category-mosaic-card__img is-active" src={thumbSrc} alt={thumbAlt} loading="lazy" />
   <img class="category-mosaic-card__img" alt="" />
+  <span
+    class="category-mosaic-card__play"
+    aria-hidden="true"
+    hidden={thumbKind !== "video"}
+  >
+    ▶
+  </span>
 </button>
 
 <style>
@@ -97,6 +106,33 @@ const {
   .category-mosaic-card:hover .category-mosaic-card__img.is-active {
     opacity: 0.85;
   }
+
+  /* Matches GalleryCard's video play-icon treatment for visual
+     consistency with the category gallery pages. Sits after both img
+     layers in source order (and so above them, with no z-index needed),
+     shown/hidden by the cycling script in step with whichever layer is
+     currently active. */
+  .category-mosaic-card__play {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: #fff;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+  }
+
+  /* `display: flex` above wins over the browser's default [hidden] {
+     display: none } rule (author styles beat the UA stylesheet
+     regardless of specificity) — see the identical fix for
+     img[hidden] in global.css. Without this, the script below
+     toggling `hidden` on/off would leave the play icon visibly
+     rendered over a photo tile. */
+  .category-mosaic-card__play[hidden] {
+    display: none;
+  }
 </style>
 
 <script>
@@ -105,6 +141,7 @@ const {
     alt: string;
     width: number;
     height: number;
+    kind: "photo" | "video";
     category: string;
     categoryLabel: string;
     // This thumb's position in its own category's slides array, so a
@@ -142,6 +179,7 @@ const {
     layers: HTMLImageElement[];
     active: HTMLImageElement;
     current: Thumb | null;
+    playEl: HTMLElement | null;
   }
 
   function initMosaicCycling(): (() => void) | null {
@@ -172,7 +210,10 @@ const {
         if (layers.length < 2) return null;
         const active =
           layers.find((img) => img.classList.contains("is-active")) ?? layers[0];
-        return { el: tile, layers, active, current: null };
+        const playEl = tile.querySelector<HTMLElement>(
+          ".category-mosaic-card__play",
+        );
+        return { el: tile, layers, active, current: null, playEl };
       })
       .filter((state): state is TileState => state !== null);
     if (states.length === 0) return null;
@@ -223,10 +264,16 @@ const {
       nextLayer.src = thumb.src;
       nextLayer.alt = thumb.alt;
 
+      // Toggled in step with the crossfade swap below (not immediately),
+      // so the play icon doesn't appear a beat early, floating over the
+      // still-fading-out previous photo.
+      const showPlay = thumb.kind === "video";
+
       if (instant) {
         state.layers.forEach((img) => img.classList.remove("is-active"));
         nextLayer.classList.add("is-active");
         state.active = nextLayer;
+        if (state.playEl) state.playEl.hidden = !showPlay;
         return;
       }
 
@@ -236,6 +283,7 @@ const {
         state.active.classList.remove("is-active");
         nextLayer.classList.add("is-active");
         state.active = nextLayer;
+        if (state.playEl) state.playEl.hidden = !showPlay;
       });
     }
 

@@ -66,6 +66,9 @@ export interface Thumb {
   // whichever photo/video it's currently showing.
   width: number;
   height: number;
+  // So a thumbnail-only context (e.g. a homepage mosaic tile) can still
+  // show a play-icon indicator for a video without needing the full Slide.
+  kind: "photo" | "video";
 }
 
 // A small render for grid/mosaic thumbnails: an optimized local image for
@@ -82,8 +85,15 @@ export async function toThumb(
       alt: entry.data.alt,
       width: aspectW,
       height: aspectH,
+      kind: "video",
     };
   }
   const thumb = await getImage({ src: entry.data.image!, width });
-  return { src: thumb.src, alt: entry.data.alt, width: aspectW, height: aspectH };
+  return {
+    src: thumb.src,
+    alt: entry.data.alt,
+    width: aspectW,
+    height: aspectH,
+    kind: "photo",
+  };
 }
