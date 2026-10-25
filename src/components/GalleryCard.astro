@@ -34,7 +34,7 @@ const slide = await toSlide(entry);
       <span class="gallery-card__video">
         <img src={entry.data.thumbnail} alt={alt} loading="lazy" />
         <span class="gallery-card__play" aria-hidden="true">
-          ▶
+          <span class="gallery-card__play-icon">▶</span>
         </span>
       </span>
     ) : (
@@ -74,9 +74,27 @@ const slide = await toSlide(entry);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2.5rem;
-    color: #fff;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
     pointer-events: none;
+  }
+
+  /* A solid circular badge rather than a bare glyph + drop shadow —
+     the glyph alone lost contrast against bright or busy thumbnails,
+     since a shadow's effectiveness depends on what's underneath it.
+     A badge gives the icon its own fixed-contrast background
+     regardless of the thumbnail, the same treatment YouTube/Vimeo use. */
+  .gallery-card__play-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+    color: #fff;
+    font-size: 2rem;
+    /* The ▶ glyph's own shape sits slightly left of its character box's
+       true center; nudge it right so it looks centered in the circle. */
+    padding-left: 0.2em;
   }
 </style>
