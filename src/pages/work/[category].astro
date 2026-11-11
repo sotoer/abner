@@ -5,6 +5,7 @@ import GalleryCard from "../../components/GalleryCard.astro";
 import Lightbox from "../../components/Lightbox.astro";
 import { getCollection } from "astro:content";
 import categoriesData from "../../data/categories.json";
+import { withBase } from "../../lib/url";
 
 export async function getStaticPaths() {
   return categoriesData.map((category) => ({
@@ -30,6 +31,14 @@ const entries = allEntries
 >
   <section class="container gallery-page">
     <h1>{category.label}</h1>
+    {
+      category.slug === "portraits" && (
+        <a class="gallery-page__promo" href={withBase("/team-headshots/")}>
+          Need headshots for your whole team? See on-site team sessions
+          <span aria-hidden="true">→</span>
+        </a>
+      )
+    }
     <MasonryGrid>
       {
         entries.map((entry, i) => <GalleryCard entry={entry} index={i} />)
@@ -51,5 +60,22 @@ const entries = allEntries
     font-size: 1.1rem;
     color: var(--color-text-muted);
     margin-bottom: var(--space-3);
+  }
+
+  .gallery-page__promo {
+    display: block;
+    margin-bottom: var(--space-3);
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--color-border);
+    font-size: 0.95rem;
+    transition: border-color 0.15s ease;
+  }
+
+  .gallery-page__promo:hover {
+    border-color: var(--color-accent);
+  }
+
+  .gallery-page__promo span {
+    color: var(--color-accent);
   }
 </style>

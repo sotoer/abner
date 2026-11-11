@@ -184,6 +184,15 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY;
     const submitButton = form?.querySelector<HTMLButtonElement>('button[type="submit"]');
     const statusEl = form?.querySelector<HTMLElement>(".contact__status");
 
+    // Links from the team headshots page arrive with ?topic=team-headshots;
+    // start the message with the details needed to quote a session.
+    const messageField = form?.querySelector<HTMLTextAreaElement>('[name="message"]');
+    const topic = new URLSearchParams(location.search).get("topic");
+    if (topic === "team-headshots" && messageField && !messageField.value) {
+      messageField.value =
+        "I'm interested in an on-site team headshot session.\n\nCompany:\nNumber of people:\nPreferred dates:\n";
+    }
+
     function setStatus(state: "sending" | "success" | "error" | null) {
       if (!statusEl) return;
       if (submitButton) submitButton.disabled = state === "sending";
