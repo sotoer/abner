@@ -1,0 +1,380 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { Image } from "astro:assets";
+import { getCollection } from "astro:content";
+import { withBase } from "../lib/url";
+
+// A landing page for the on-site team headshot offer, meant to be linked
+// directly from outreach (LinkedIn/email) rather than from the main nav.
+// It reuses the corporate studio headshots from the portraits gallery —
+// update `teamSet` when new team work is added (ideally one matched set
+// from a single company shoot, same background and lighting).
+const teamSet = [1, 2, 3, 4, 5];
+
+const portraits = await getCollection(
+  "galleries",
+  (entry) => entry.data.category === "portraits" && Boolean(entry.data.image),
+);
+const headshots = teamSet
+  .map((order) => portraits.find((entry) => entry.data.order === order))
+  .filter((entry) => entry !== undefined);
+
+const price = "$4,500";
+const teamSize = 40;
+const bookHref = withBase("/contact/?topic=team-headshots");
+
+const steps = [
+  {
+    title: "Pick a date",
+    body: "Tell me your team size and a few dates that work. I confirm within one business day.",
+  },
+  {
+    title: "I bring the studio",
+    body: "Lights, backdrop and camera set up in a conference room or open corner of your office. Each person needs about five minutes, so no one loses more than a coffee break.",
+  },
+  {
+    title: "Matched photos in 7 days",
+    body: "Everyone gets a retouched headshot with the same background and lighting, sized for LinkedIn, your website and email signatures.",
+  },
+];
+
+const included = [
+  `Up to ${teamSize} people in one on-site session`,
+  "Matching backdrop and lighting for the whole team",
+  "Several poses per person, with each person choosing their favorite",
+  "Professional retouching on every selected headshot",
+  "Web and print sizes, delivered in an online gallery within 7 days",
+  "A set of candid office and team photos for your website",
+];
+
+const faqs = [
+  {
+    q: "What if we have more than 40 people, or people who miss the day?",
+    a: "Larger teams can be split across multiple days. For anyone who misses the session, I can schedule a short makeup session and match the original lighting so their photo fits with the rest.",
+  },
+  {
+    q: "How much space do you need?",
+    a: "About a 10 × 12 foot area, such as a conference room, and a standard outlet. Setup and teardown take about 30 minutes each.",
+  },
+  {
+    q: "Where do you travel?",
+    a: "Anywhere in the greater Sacramento area, including Roseville, Folsom, Rocklin, Davis, Elk Grove and El Dorado Hills.",
+  },
+  {
+    q: "How do we pay?",
+    a: "A 50% deposit reserves your date. The balance is due when your gallery is delivered.",
+  },
+];
+
+const brands = [
+  "Beyond Meat",
+  "World Market",
+  "Raley's",
+  "Analog Devices",
+  "Albertsons",
+  "Clorox",
+];
+---
+
+<BaseLayout
+  title="Team Headshots"
+  description={`On-site team headshots for Sacramento companies. One day at your office, your whole team photographed, matched retouched headshots delivered in 7 days. ${price} for up to ${teamSize} people.`}
+>
+  <section class="container th-hero">
+    <p class="th-eyebrow">On-site team headshots · Sacramento</p>
+    <h1>Your whole team, one day, photos that match.</h1>
+    <p class="th-lede">
+      I set up a studio in your office and photograph everyone in a single
+      day. Each person gets a polished, retouched headshot with the same
+      background and lighting, delivered in 7 days.
+    </p>
+    <div class="th-actions">
+      <a class="th-button" href={bookHref}>Check available dates</a>
+      <span class="th-price-note">{price} flat for up to {teamSize} people</span>
+    </div>
+  </section>
+
+  <section class="container th-section" aria-labelledby="th-work">
+    <h2 id="th-work" class="th-label">Recent headshots</h2>
+    <ul class="th-grid">
+      {
+        headshots.map((entry) => (
+          <li>
+            <Image
+              src={entry.data.image!}
+              alt={entry.data.alt}
+              widths={[320, 480, 640]}
+              sizes="(min-width: 900px) 20vw, (min-width: 600px) 33vw, 50vw"
+            />
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="container th-section" aria-labelledby="th-how">
+    <h2 id="th-how" class="th-label">How it works</h2>
+    <ol class="th-steps">
+      {
+        steps.map((step, i) => (
+          <li>
+            <span class="th-step-num">{i + 1}</span>
+            <h3>{step.title}</h3>
+            <p>{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </section>
+
+  <section class="container th-section" aria-labelledby="th-pricing">
+    <h2 id="th-pricing" class="th-label">Pricing</h2>
+    <div class="th-pricing">
+      <div class="th-pricing__price">
+        <p class="th-pricing__amount">{price}</p>
+        <p class="th-pricing__unit">
+          One day on site, up to {teamSize} people
+        </p>
+        <a class="th-button" href={bookHref}>Request a date</a>
+      </div>
+      <ul class="th-pricing__list">
+        {included.map((item) => <li>{item}</li>)}
+      </ul>
+    </div>
+  </section>
+
+  <section class="container th-section" aria-labelledby="th-brands">
+    <h2 id="th-brands" class="th-label">Brands I've worked with</h2>
+    <ul class="th-brands">
+      {brands.map((brand) => <li>{brand}</li>)}
+    </ul>
+  </section>
+
+  <section class="container th-section" aria-labelledby="th-faq">
+    <h2 id="th-faq" class="th-label">Questions</h2>
+    <dl class="th-faq">
+      {
+        faqs.map((faq) => (
+          <div>
+            <dt>{faq.q}</dt>
+            <dd>{faq.a}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </section>
+
+  <section class="container th-cta">
+    <h2>Ready to get your team photographed?</h2>
+    <p>Send your team size and a few dates, and I'll confirm availability.</p>
+    <a class="th-button" href={bookHref}>Check available dates</a>
+  </section>
+</BaseLayout>
+
+<style>
+  .th-hero {
+    padding-block: var(--space-6) var(--space-5);
+    max-width: 860px;
+    margin-inline: auto;
+    text-align: center;
+  }
+
+  .th-eyebrow,
+  .th-label {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-sans);
+    font-weight: 400;
+  }
+
+  .th-hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 7vw, 4.5rem);
+    line-height: 1;
+    letter-spacing: 0.01em;
+    margin-block: var(--space-2) var(--space-3);
+  }
+
+  .th-lede {
+    font-size: 1.1rem;
+    max-width: 620px;
+    margin-inline: auto;
+  }
+
+  .th-actions {
+    margin-top: var(--space-4);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .th-price-note {
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+  }
+
+  .th-button {
+    display: inline-block;
+    padding: 0.75rem 1.75rem;
+    border: 1px solid var(--color-text);
+    background: var(--color-text);
+    color: var(--color-bg);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.85rem;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .th-button:hover {
+    background: none;
+    color: var(--color-text);
+  }
+
+  .th-section {
+    padding-block: var(--space-5);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .th-label {
+    margin-bottom: var(--space-3);
+  }
+
+  .th-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-1);
+  }
+
+  .th-grid img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    object-position: center top;
+  }
+
+  @media (min-width: 600px) {
+    .th-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (min-width: 900px) {
+    .th-grid {
+      grid-template-columns: repeat(5, 1fr);
+    }
+  }
+
+  .th-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  @media (min-width: 760px) {
+    .th-steps {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .th-step-num {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    line-height: 1;
+    color: var(--color-accent);
+  }
+
+  .th-steps h3 {
+    font-size: 1.05rem;
+    margin-block: var(--space-1);
+  }
+
+  .th-steps p,
+  .th-faq dd {
+    color: var(--color-text-muted);
+  }
+
+  .th-pricing {
+    display: grid;
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  @media (min-width: 760px) {
+    .th-pricing {
+      grid-template-columns: 1fr 1.4fr;
+    }
+  }
+
+  .th-pricing__amount {
+    font-family: var(--font-display);
+    font-size: 4rem;
+    line-height: 1;
+  }
+
+  .th-pricing__unit {
+    color: var(--color-text-muted);
+    margin-block: var(--space-1) var(--space-3);
+  }
+
+  .th-pricing__list li {
+    padding-block: 0.65rem;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .th-pricing__list li:first-child {
+    padding-top: 0;
+  }
+
+  .th-brands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .th-faq {
+    margin: 0;
+    display: grid;
+    gap: var(--space-3);
+    max-width: 760px;
+  }
+
+  .th-faq dt {
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+  }
+
+  .th-faq dd {
+    margin: 0;
+  }
+
+  .th-cta {
+    padding-block: var(--space-6);
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+  }
+
+  .th-cta h2 {
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(2rem, 5vw, 3rem);
+    line-height: 1.05;
+    margin-bottom: var(--space-2);
+  }
+
+  .th-cta p {
+    color: var(--color-text-muted);
+    margin-bottom: var(--space-3);
+  }
+</style>
