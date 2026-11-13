@@ -1,5 +1,7 @@
 ---
 import { withBase } from "../lib/url";
+import LogoHorizontal from "../assets/logo-horizontal.svg";
+import LogoMark from "../assets/logo-mark.svg";
 
 const links = [
   { href: "/work", label: "Work" },
@@ -11,7 +13,10 @@ const currentPath = Astro.url.pathname;
 
 <header class="site-nav">
   <div class="container site-nav__inner">
-    <a href={withBase("/")} class="site-nav__logo">Abner Soto</a>
+    <a href={withBase("/")} class="site-nav__logo" aria-label="Abner Soto, home">
+      <LogoHorizontal class="site-nav__logo-full" aria-hidden="true" />
+      <LogoMark class="site-nav__logo-mark" aria-hidden="true" />
+    </a>
     <nav aria-label="Main">
       <ul>
         {
@@ -52,9 +57,30 @@ const currentPath = Astro.url.pathname;
   }
 
   .site-nav__logo {
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    color: var(--color-text);
+  }
+
+  .site-nav__logo svg {
+    display: block;
+    height: 2.75rem;
+    width: auto;
+  }
+
+  /* Below ~480px the full lockup crowds the nav links; show the monogram. */
+  .site-nav__logo-mark {
+    display: none !important;
+  }
+
+  @media (max-width: 479px) {
+    .site-nav__logo-full {
+      display: none !important;
+    }
+
+    .site-nav__logo-mark {
+      display: block !important;
+    }
   }
 
   nav ul {
