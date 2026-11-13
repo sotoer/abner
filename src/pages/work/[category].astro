@@ -109,12 +109,12 @@ const promoFaces =
   }
 
   .gallery-page__promo-faces li {
-    width: 2.75rem;
-    height: 2.75rem;
+    width: 3.5rem;
+    height: 3.5rem;
     border-radius: 50%;
     overflow: hidden;
     border: 2px solid var(--color-border);
-    margin-left: -0.75rem;
+    margin-left: -1rem;
   }
 
   .gallery-page__promo-faces li:first-child {
@@ -125,6 +125,11 @@ const promoFaces =
     width: 100%;
     height: 100%;
     object-fit: cover;
+    /* These are tall headshot crops; a dead-center vertical crop into a
+       circle cuts into the hairline since there's more frame below the
+       face (chest/shoulders) than above it. Biasing the crop upward
+       keeps the full head in frame and crops the shoulders instead. */
+    object-position: center 15%;
   }
 
   .gallery-page__promo-copy {
